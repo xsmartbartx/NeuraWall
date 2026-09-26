@@ -3,31 +3,14 @@
 from __future__ import annotations
 
 import ipaddress
-from dataclasses import dataclass, field
 
 from neurawall.core.models import (
-    AnomalyScore,
-    Classification,
-    FlowRecord,
+    Evidence,
     HygieneFinding,
     Rule,
     RuleMatch,
-    ThreatLabel,
 )
 from neurawall.core.validation import domain_matches_suffix, ip_in_any
-
-
-@dataclass(frozen=True)
-class Evidence:
-    """A flow plus every signal the tiers produced for it."""
-
-    flow: FlowRecord
-    anomaly: AnomalyScore | None = None
-    classifications: tuple[Classification, ...] = field(default_factory=tuple)
-
-    @property
-    def malicious_labels(self) -> list[Classification]:
-        return [c for c in self.classifications if c.label != ThreatLabel.BENIGN]
 
 
 def match_flow(match: RuleMatch, ev: Evidence) -> bool:

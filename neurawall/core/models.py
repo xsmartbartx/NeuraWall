@@ -173,6 +173,18 @@ class Classification(Frozen):
     model_version: str = "tier2"
 
 
+class Evidence(Frozen):
+    """A flow plus every signal the tiers produced for it."""
+
+    flow: FlowRecord
+    anomaly: AnomalyScore | None = None
+    classifications: tuple[Classification, ...] = ()
+
+    @property
+    def malicious_labels(self) -> list[Classification]:
+        return [c for c in self.classifications if c.label != ThreatLabel.BENIGN]
+
+
 # ---------------------------------------------------------------------------
 # Rules, verdicts, bundles
 # ---------------------------------------------------------------------------
