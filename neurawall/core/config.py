@@ -39,9 +39,12 @@ class InferenceSettings(_Section):
 
 class LlmSettings(_Section):
     provider: Literal["anthropic", "offline"] = "anthropic"
-    model: str = "claude-sonnet-5"
+    model: str = "claude-opus-5"
     api_key: SecretStr | None = None
-    max_tokens: int = Field(4096, ge=256, le=32000)
+    max_tokens: int = Field(16000, ge=256, le=64000)
+    effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+    #: Server-side refusal fallbacks (beta ``server-side-fallback-2026-07-01``).
+    server_side_fallbacks: bool = True
     #: Hard budget on Tier 3 invocations per hour, per cluster (blueprint §5.4).
     max_calls_per_hour: int = Field(120, ge=0)
     timeout_seconds: float = Field(60.0, gt=0)
