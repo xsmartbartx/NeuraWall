@@ -1,6 +1,6 @@
 [project]
 name = "neurawall"
-version = "1.0.1"
+version = "1.1.0"
 description = "NeuraWall — AI-assisted firewall with deterministic enforcement, three-tier inference and human-approved policy."
 readme = "README.md"
 license = "LicenseRef-Proprietary"
@@ -105,6 +105,7 @@ modules = [
     "neurawall.modules.flow_collector",
     "neurawall.modules.datapath",
     "neurawall.modules.policy_engine",
+    "neurawall.modules.billing",
 ]
 
 [[tool.importlinter.contracts]]

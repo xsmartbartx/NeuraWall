@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-09-27
+
+### Added
+- Plans and Stripe billing, modelled on Vigilo: Community (free), Pro ($149/mo), Business ($499/mo),
+  Enterprise ($3,000/mo) self-serve through Stripe Checkout (monthly or yearly, two months free),
+  Enterprise Dedicated by licence. Stripe Customer Portal for plan changes, cards and invoices.
+- Entitlements are enforced: enrolled-node limit, plan-based flow retention, Claude AI advisor on
+  paid plans only. Unknown or lapsed plans fail closed to Community (3-day renewal grace).
+- Signed Stripe webhook (`/api/v1/billing/webhook`) that applies only this installation's
+  subscriptions on a shared Stripe account; console Billing page; audit entries for billing changes.
+
+### Changed
+- `flow_retention_seconds` is now an optional override; by default the plan sets retention.
+
 ## [1.0.1] — 2026-09-27
 
 ### Fixed

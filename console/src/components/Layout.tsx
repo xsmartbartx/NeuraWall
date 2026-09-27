@@ -47,6 +47,7 @@ export function Layout() {
           {link("/fleet", "Fleet")}
           {can("audit:read") && link("/audit", "Audit trail")}
           {can("users:manage") && link("/users", "Users")}
+          {link("/billing", "Billing")}
           {link("/settings", "Settings")}
         </nav>
         <div className="sidebar-foot">

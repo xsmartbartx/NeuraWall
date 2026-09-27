@@ -174,6 +174,20 @@ class Setting(Base):
     value: Mapped[Any] = mapped_column(JSON)
 
 
+class Subscription(Base):
+    """Stripe subscriptions for this installation (one control plane = one customer)."""
+
+    __tablename__ = "subscriptions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(20), default="stripe")
+    provider_subscription_id: Mapped[str] = mapped_column(String(120), unique=True)
+    provider_customer_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    plan_id: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(20))
+    current_period_end: Mapped[float | None] = mapped_column(Float, nullable=True)
+    updated_at: Mapped[float] = mapped_column(Float, default=_now)
+
+
 class NodeHeartbeat(Base):
     __tablename__ = "node_heartbeats"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

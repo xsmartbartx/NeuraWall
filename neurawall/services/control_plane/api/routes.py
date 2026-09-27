@@ -27,6 +27,7 @@ from neurawall.services.control_plane import db
 from neurawall.services.control_plane.api import serializers as ser
 from neurawall.services.control_plane.api.deps import (
     Principal,
+    Unauthenticated,
     current_node,
     current_user,
     get_cp,
@@ -569,3 +570,49 @@ def ingest_flows(body: FlowBatchIn, cp: CP, node: NodeAuth) -> dict[str, Any]:
             if v.flow_id in by_id
         ],
     }
+
+
+# ---------------------------------------------------------------- billing
+
+BillingAdmin = Annotated[Principal, Depends(require(Permission.MANAGE_SETTINGS))]
+
+
+class CheckoutIn(Body):
+    plan: Literal["pro", "business", "enterprise"]
+    interval: Literal["month", "year"] = "month"
+
+
+@api.get("/billing", tags=["billing"])
+def billing_status(cp: CP, _: Reader) -> dict[str, Any]:
+    return cp.billing_status()
+
+
+@api.get("/billing/plans", tags=["billing"])
+def billing_plans(cp: CP) -> list[dict[str, Any]]:
+    """Public: the plan catalogue (no account, no secrets)."""
+    return cp.billing_status()["plans"]
+
+
+@api.post("/billing/checkout", tags=["billing"])
+def billing_checkout(body: CheckoutIn, cp: CP, actor: BillingAdmin) -> dict[str, str]:
+    return {
+        "checkout_url": cp.start_checkout(actor.email, plan_id=body.plan, interval=body.interval)
+    }
+
+
+@api.post("/billing/portal", tags=["billing"])
+def billing_portal(cp: CP, actor: BillingAdmin) -> dict[str, str]:
+    return {"portal_url": cp.start_portal(actor.email)}
+
+
+@api.post("/billing/webhook", tags=["billing"])
+async def billing_webhook(request: Request, cp: CP) -> dict[str, str]:
+    """Public: Stripe authenticates itself with the `Stripe-Signature` HMAC over the exact
+    raw body. Foreign or unknown events return 200 "ignored" so Stripe never disables
+    the shared endpoint."""
+    raw = await request.body()
+    try:
+        status = cp.apply_stripe_webhook(raw, request.headers.get("Stripe-Signature", ""))
+    except PolicyViolation as exc:
+        raise Unauthenticated(exc.message) from exc
+    return {"status": status}

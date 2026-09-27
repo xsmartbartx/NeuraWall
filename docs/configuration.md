@@ -22,7 +22,7 @@ Configuration is layered: **defaults → YAML file → environment → runtime o
 | `log_level` | `NEURAWALL_LOG_LEVEL` | `DEBUG` / `INFO` / `WARNING` / `ERROR` | `INFO` | Log verbosity. |
 | `log_json` | `NEURAWALL_LOG_JSON` | bool | `True` | Structured JSON logs (recommended in production) instead of human-readable text. |
 | `demo_mode` | `NEURAWALL_DEMO_MODE` | bool | `False` | Generate synthetic traffic from a built-in demo sensor (for evaluation / sales demos). |
-| `flow_retention_seconds` | `NEURAWALL_FLOW_RETENTION_SECONDS` | int | `604800` | Flow records retained for simulation / investigation. |
+| `flow_retention_seconds` | `NEURAWALL_FLOW_RETENTION_SECONDS` | int \| None | — | Override flow retention. Unset = the active plan's retention (7/30/90 days). |
 
 ## `inference`
 
@@ -69,6 +69,21 @@ Configuration is layered: **defaults → YAML file → environment → runtime o
 | `auth.bootstrap_admin_email` | `NEURAWALL_AUTH__BOOTSTRAP_ADMIN_EMAIL` | str | `admin@neurawall.local` | Email of the admin account created on first start. |
 | `auth.bootstrap_admin_password` | `NEURAWALL_AUTH__BOOTSTRAP_ADMIN_PASSWORD` | SecretStr \| None | — | Initial admin password. If unset, one is generated into `data_dir/initial-admin-password.txt`. |
 | `auth.login_rate_per_minute` | `NEURAWALL_AUTH__LOGIN_RATE_PER_MINUTE` | int | `10` | Login attempts allowed per minute per client IP and per account. |
+
+## `billing`
+
+| Key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `billing.plan` | `NEURAWALL_BILLING__PLAN` | `community` / `pro` / `business` / `enterprise` / `enterprise_dedicated` | `community` | Plan for installs not billed through Stripe (self-hosted licences, Enterprise Dedicated). An active Stripe subscription takes precedence. |
+| `billing.stripe_secret_key` | `NEURAWALL_BILLING__STRIPE_SECRET_KEY` | SecretStr \| None | — | Stripe secret key (`sk_live_…`). Empty = self-serve billing disabled. |
+| `billing.stripe_webhook_secret` | `NEURAWALL_BILLING__STRIPE_WEBHOOK_SECRET` | SecretStr \| None | — | Signing secret of the webhook endpoint `<public_url>/api/v1/billing/webhook`. |
+| `billing.stripe_portal_configuration_id` | `NEURAWALL_BILLING__STRIPE_PORTAL_CONFIGURATION_ID` | str \| None | — | Stripe Customer Portal configuration id (optional; Stripe default otherwise). |
+| `billing.price_pro_month` | `NEURAWALL_BILLING__PRICE_PRO_MONTH` | str \| None | — | Stripe Price ids per plan and interval. |
+| `billing.price_pro_year` | `NEURAWALL_BILLING__PRICE_PRO_YEAR` | str \| None | — |  |
+| `billing.price_business_month` | `NEURAWALL_BILLING__PRICE_BUSINESS_MONTH` | str \| None | — |  |
+| `billing.price_business_year` | `NEURAWALL_BILLING__PRICE_BUSINESS_YEAR` | str \| None | — |  |
+| `billing.price_enterprise_month` | `NEURAWALL_BILLING__PRICE_ENTERPRISE_MONTH` | str \| None | — |  |
+| `billing.price_enterprise_year` | `NEURAWALL_BILLING__PRICE_ENTERPRISE_YEAR` | str \| None | — |  |
 
 ## Production requirements
 

@@ -102,6 +102,28 @@ docker compose exec control-plane neurawall create-user --email you@example.com 
 
 ## Data retention
 
-Flow records are purged after `flow_retention_seconds` (default 7 days); they back the
+Flow records are purged after the plan's retention (Community/Pro 7 days, Business 30,
+Enterprise 90; `flow_retention_seconds` overrides it); they back the
 simulator and investigations. Node heartbeats are kept 7 days. Alerts, rules, bundles, drafts
 and the audit trail are kept indefinitely. Export them before deleting data for compliance.
+
+## Billing (Stripe)
+
+Plans: Community (free, 1 node, 7-day retention, offline advisor), Pro, Business and Enterprise
+(self-serve via Stripe), Enterprise Dedicated (licence via sales). An active Stripe subscription
+sets the plan. Otherwise `billing.plan` does, which is how licensed self-hosted installs are configured.
+Unknown or lapsed plans fall back to Community.
+
+To enable self-serve billing on an installation:
+
+1. In Stripe, create one Product per paid plan with a monthly and a yearly recurring Price
+   (Pro $149/$1,490, Business $499/$4,990, Enterprise $3,000/$30,000).
+2. Add a webhook endpoint `https://<public_url>/api/v1/billing/webhook` for
+   `customer.subscription.created`, `.updated` and `.deleted`; copy its signing secret.
+3. Set `NEURAWALL_BILLING__STRIPE_SECRET_KEY`, `NEURAWALL_BILLING__STRIPE_WEBHOOK_SECRET` and the six
+   `NEURAWALL_BILLING__PRICE_<PLAN>_<MONTH|YEAR>` ids, then restart.
+
+The Stripe account may be shared with other products: NeuraWall tags its subscriptions with
+`metadata.neurawall_installation` and ignores every other event (200 "ignored"), so it never
+applies, or breaks, another product's billing. Plan changes are recorded in the audit trail
+(`billing.*`).

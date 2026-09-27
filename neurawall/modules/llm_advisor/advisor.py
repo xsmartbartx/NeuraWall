@@ -7,6 +7,7 @@ advisor when Claude is not configured, over budget or unavailable.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Protocol, TypeVar
 
 from pydantic import BaseModel
@@ -39,14 +40,22 @@ class Backend(Protocol):
 
 
 class LlmAdvisor:
-    def __init__(self, backend: Backend | None, *, max_calls_per_hour: int = 120) -> None:
+    def __init__(
+        self,
+        backend: Backend | None,
+        *,
+        max_calls_per_hour: int = 120,
+        allowed: Callable[[], bool] = lambda: True,
+    ) -> None:
         self.backend = backend
         self.budget = HourlyBudget(max_calls_per_hour)
         self.last_error: str | None = None
+        #: Entitlement gate (e.g. the subscription plan). False = offline advisor only.
+        self.allowed = allowed
 
     @property
     def mode(self) -> str:
-        if self.backend is None:
+        if self.backend is None or not self.allowed():
             return "offline"
         return "degraded" if self.last_error else "online"
 
@@ -116,7 +125,7 @@ class LlmAdvisor:
     def _run(
         self, task: str, payload: dict[str, object], output: type[T], fallback: object
     ) -> tuple[T, DraftSource]:
-        if self.backend is not None and self.budget.try_spend():
+        if self.backend is not None and self.allowed() and self.budget.try_spend():
             markers = guardrails.injection_markers(payload)
             context = guardrails.wrap_untrusted(payload | {"injection_markers": markers})
             try:

@@ -7,6 +7,7 @@ import { AuthProvider, ToastProvider, useAuth } from "./lib/hooks";
 import { Alerts } from "./pages/Alerts";
 import { Approvals } from "./pages/Approvals";
 import { Audit } from "./pages/Audit";
+import { Billing } from "./pages/Billing";
 import { Bundles } from "./pages/Bundles";
 import { Fleet } from "./pages/Fleet";
 import { Flows } from "./pages/Flows";
@@ -40,6 +41,7 @@ function App() {
         <Route path="fleet" element={<Fleet />} />
         <Route path="audit" element={<Audit />} />
         <Route path="users" element={<Users />} />
+        <Route path="billing" element={<Billing />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

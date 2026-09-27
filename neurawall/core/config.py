@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from neurawall.core.errors import ValidationFailure
@@ -75,6 +75,50 @@ class PolicySettings(_Section):
     starter_rules: bool = True
 
 
+class BillingSettings(_Section):
+    #: Plan for installs not billed through Stripe (self-hosted licences, Enterprise
+    #: Dedicated). An active Stripe subscription takes precedence.
+    plan: Literal["community", "pro", "business", "enterprise", "enterprise_dedicated"] = (
+        "community"
+    )
+    #: Stripe secret key (`sk_live_…`). Empty = self-serve billing disabled.
+    stripe_secret_key: SecretStr | None = None
+    #: Signing secret of the webhook endpoint `<public_url>/api/v1/billing/webhook`.
+    stripe_webhook_secret: SecretStr | None = None
+    #: Stripe Customer Portal configuration id (optional; Stripe default otherwise).
+    stripe_portal_configuration_id: str | None = None
+    #: Stripe Price ids per plan and interval.
+    price_pro_month: str | None = None
+    price_pro_year: str | None = None
+    price_business_month: str | None = None
+    price_business_year: str | None = None
+    price_enterprise_month: str | None = None
+    price_enterprise_year: str | None = None
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _empty_is_unset(cls, v: Any) -> Any:
+        # Compose passes unset variables as "", which must mean "not configured".
+        return None if isinstance(v, str) and not v.strip() else v
+
+    @property
+    def self_serve_enabled(self) -> bool:
+        return self.stripe_secret_key is not None and self.stripe_webhook_secret is not None
+
+    def price_id(self, plan: str, interval: str) -> str | None:
+        value = getattr(self, f"price_{plan}_{interval}", None)
+        return value or None
+
+    def plan_by_price(self) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for plan in ("pro", "business", "enterprise"):
+            for interval in ("month", "year"):
+                pid = self.price_id(plan, interval)
+                if pid:
+                    out[pid] = plan
+        return out
+
+
 class AuthSettings(_Section):
     #: HMAC key for console sessions. Required in production (`openssl rand -base64 48`).
     secret_key: SecretStr | None = None
@@ -115,13 +159,14 @@ class Settings(BaseSettings):
     log_json: bool = True
     #: Generate synthetic traffic from a built-in demo sensor (for evaluation / sales demos).
     demo_mode: bool = False
-    #: Flow records retained for simulation / investigation.
-    flow_retention_seconds: int = Field(7 * 24 * 3600, ge=3600)
+    #: Override flow retention. Unset = the active plan's retention (7/30/90 days).
+    flow_retention_seconds: int | None = Field(None, ge=3600)
 
     inference: InferenceSettings = InferenceSettings()
     llm: LlmSettings = LlmSettings()
     policy: PolicySettings = PolicySettings()
     auth: AuthSettings = AuthSettings()
+    billing: BillingSettings = BillingSettings()
 
     @classmethod
     def settings_customise_sources(

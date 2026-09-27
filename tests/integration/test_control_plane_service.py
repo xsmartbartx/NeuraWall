@@ -19,6 +19,7 @@ def cp(tmp_path):
         inference={"baseline_warmup_flows": 50, "isolation_forest_trees": 20},
         auth={"bootstrap_admin_password": "Admin-Password-1!"},
         policy={"rollout_stage_seconds": 0},
+        billing={"plan": "enterprise"},
     )
     plane = ControlPlane(settings, signer=EphemeralSigner(), advisor_backend=None)
     yield plane

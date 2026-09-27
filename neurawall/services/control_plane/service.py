@@ -43,6 +43,17 @@ from neurawall.core.models import (
 )
 from neurawall.core.telemetry import REGISTRY
 from neurawall.modules.anomaly_engine import AnomalyEngine
+from neurawall.modules.billing import (
+    PLANS,
+    NotOurEvent,
+    Plan,
+    StripeClient,
+    check_nodes,
+    entitlements,
+    interpret_event,
+    parse_event,
+    verify_signature,
+)
 from neurawall.modules.flow_collector.generator import TrafficGenerator
 from neurawall.modules.l7_classifier import L7Classifier, needs_tier3
 from neurawall.modules.llm_advisor import ClaudeBackend, LlmAdvisor
@@ -115,7 +126,9 @@ class ControlPlane:
         )
         self.classifier = L7Classifier(rate_per_second=settings.inference.t2_rate_per_second)
         self.advisor = LlmAdvisor(
-            self._make_backend(advisor_backend), max_calls_per_hour=settings.llm.max_calls_per_hour
+            self._make_backend(advisor_backend),
+            max_calls_per_hour=settings.llm.max_calls_per_hour,
+            allowed=lambda: self.plan().llm_advisor_allowed,
         )
         self._engines: dict[int, PolicyEngine] = {}
         self._audit_lock = threading.Lock()
@@ -152,6 +165,9 @@ class ControlPlane:
 
     def _bootstrap(self) -> None:
         with self.db.session() as s:
+            if s.get(db.Setting, "installation_id") is None:
+                # Identifies this control plane's subscriptions on a shared Stripe account.
+                s.add(db.Setting(key="installation_id", value="nwi_" + secrets.token_hex(12)))
             if s.scalar(select(func.count()).select_from(db.User)) == 0:
                 self._create_bootstrap_admin(s)
             has_bundle = (s.scalar(select(func.count()).select_from(db.BundleRow)) or 0) > 0
@@ -401,6 +417,15 @@ class ControlPlane:
             ).first()
             if row is None or row.uses_remaining <= 0 or row.expires_at < time.time():
                 raise PolicyViolation("enrollment token is invalid, used or expired")
+            active_nodes = (
+                s.scalar(
+                    select(func.count()).select_from(db.Node).where(db.Node.revoked.is_(False))
+                )
+                or 0
+            )
+            decision = check_nodes(active_nodes, self.plan())
+            if not decision.allowed:
+                raise PolicyViolation(decision.reason)
             api_key, key_hash = generate_api_key()
             node = db.Node(
                 id="node-" + secrets.token_hex(6),
@@ -1113,6 +1138,162 @@ class ControlPlane:
         text, source = self.advisor.explain_verdict(verdict, rule, ev)
         return {"explanation": text, "source": source.value}
 
+    # ------------------------------------------------------------------ billing
+
+    #: Keep paid access briefly past period end while Stripe finishes a renewal.
+    BILLING_GRACE_SECONDS = 3 * 86400
+
+    @property
+    def installation_id(self) -> str:
+        with self.db.session() as s:
+            row = s.get(db.Setting, "installation_id")
+            return str(row.value) if row else ""
+
+    def active_subscription(self) -> db.Subscription | None:
+        cutoff = time.time() - self.BILLING_GRACE_SECONDS
+        with self.db.session() as s:
+            sub = s.scalars(
+                select(db.Subscription)
+                .where(db.Subscription.status == "active")
+                .where(
+                    (db.Subscription.current_period_end.is_(None))
+                    | (db.Subscription.current_period_end >= cutoff)
+                )
+                .order_by(db.Subscription.updated_at.desc())
+                .limit(1)
+            ).first()
+            if sub is not None:
+                s.expunge(sub)
+            return sub
+
+    def plan(self) -> Plan:
+        """Active Stripe subscription first, else the configured licence plan.
+
+        Fails closed: anything unrecognised resolves to Community."""
+        sub = self.active_subscription()
+        return entitlements(sub.plan_id if sub else self.settings.billing.plan)
+
+    def retention_seconds(self) -> int:
+        if self.settings.flow_retention_seconds is not None:
+            return self.settings.flow_retention_seconds
+        days = self.plan().retention_days
+        return (days if days is not None else 365) * 86400
+
+    def billing_status(self) -> dict[str, Any]:
+        plan = self.plan()
+        sub = self.active_subscription()
+        with self.db.session() as s:
+            nodes = (
+                s.scalar(
+                    select(func.count()).select_from(db.Node).where(db.Node.revoked.is_(False))
+                )
+                or 0
+            )
+        cfg = self.settings.billing
+        return {
+            "plan": _plan_dict(plan),
+            "source": "stripe" if sub else "licence",
+            "subscription": None
+            if sub is None
+            else {
+                "status": sub.status,
+                "current_period_end": sub.current_period_end,
+                "manageable": bool(sub.provider_customer_id),
+            },
+            "usage": {"nodes": nodes, "retention_days": self.retention_seconds() // 86400},
+            "self_serve": cfg.self_serve_enabled,
+            "plans": [
+                _plan_dict(p)
+                | {
+                    "purchasable": {
+                        i: bool(cfg.self_serve_enabled and cfg.price_id(p.plan_id.value, i))
+                        for i in ("month", "year")
+                    }
+                }
+                for p in PLANS.values()
+            ],
+        }
+
+    def _stripe(self) -> StripeClient:
+        cfg = self.settings.billing
+        if not cfg.self_serve_enabled or cfg.stripe_secret_key is None:
+            raise PolicyViolation("self-serve billing is not enabled on this installation")
+        return StripeClient(
+            cfg.stripe_secret_key.get_secret_value(),
+            portal_configuration_id=cfg.stripe_portal_configuration_id,
+        )
+
+    def start_checkout(self, actor: str, *, plan_id: str, interval: str) -> str:
+        price = self.settings.billing.price_id(plan_id, interval)
+        plan = entitlements(plan_id)
+        if plan.plan_id.value != plan_id or not plan.self_serve or not price:
+            raise PolicyViolation(f"plan {plan_id!r} ({interval}) is not available for checkout")
+        base = f"{self.settings.public_url.rstrip('/')}/billing"
+        url = self._stripe().create_checkout(
+            price_id=price,
+            installation_id=self.installation_id,
+            customer_email=actor,
+            success_url=f"{base}?checkout=success",
+            cancel_url=base,
+            plan_id=plan_id,
+        )
+        self.audit(
+            actor, "billing.checkout_started", "billing", {"plan": plan_id, "interval": interval}
+        )
+        return url
+
+    def start_portal(self, actor: str) -> str:
+        sub = self.active_subscription()
+        if sub is None or not sub.provider_customer_id:
+            raise NotFound("no Stripe subscription to manage")
+        url = self._stripe().create_portal(
+            customer_id=sub.provider_customer_id,
+            return_url=f"{self.settings.public_url.rstrip('/')}/billing",
+        )
+        self.audit(actor, "billing.portal_opened", "billing")
+        return url
+
+    def apply_stripe_webhook(self, raw_body: bytes, signature: str) -> str:
+        """Returns "applied" or "ignored"; raises PolicyViolation on a bad signature."""
+        cfg = self.settings.billing
+        secret = cfg.stripe_webhook_secret.get_secret_value() if cfg.stripe_webhook_secret else ""
+        if not secret:
+            return "ignored"
+        if not verify_signature(raw_body, signature, secret):
+            raise PolicyViolation("invalid Stripe webhook signature")
+        try:
+            event = interpret_event(
+                parse_event(raw_body),
+                installation_id=self.installation_id,
+                plan_by_price=cfg.plan_by_price(),
+            )
+        except NotOurEvent:
+            return "ignored"
+        period_end = event.period_end.timestamp() if event.period_end else None
+        with self.db.session() as s:
+            sub = s.scalars(
+                select(db.Subscription).where(
+                    db.Subscription.provider_subscription_id == event.subscription_id
+                )
+            ).first()
+            if sub is None:
+                sub = db.Subscription(provider_subscription_id=event.subscription_id)
+                s.add(sub)
+            before = (sub.plan_id, sub.status)
+            sub.plan_id = event.plan_id
+            sub.status = event.status
+            sub.current_period_end = period_end
+            sub.provider_customer_id = event.customer_id or sub.provider_customer_id
+            sub.updated_at = time.time()
+        if before != (event.plan_id, event.status):
+            self.audit(
+                "stripe",
+                "billing.subscription_updated",
+                f"subscription:{event.subscription_id}",
+                {"plan": event.plan_id, "status": event.status, "event": event.event_type},
+            )
+        return "applied"
+
     # ------------------------------------------------------------------ dashboard
 
     def dashboard(self, hours: int = 24) -> dict[str, Any]:
@@ -1251,9 +1432,7 @@ class ControlPlane:
     def run_maintenance(self) -> None:
         now = time.time()
         with self.db.session() as s:
-            s.execute(
-                delete(db.FlowRow).where(db.FlowRow.ts < now - self.settings.flow_retention_seconds)
-            )
+            s.execute(delete(db.FlowRow).where(db.FlowRow.ts < now - self.retention_seconds()))
             s.execute(delete(db.NodeHeartbeat).where(db.NodeHeartbeat.ts < now - 7 * 86400))
             rolling = s.scalars(
                 select(db.BundleRow).where(db.BundleRow.status == "rolling_out")
@@ -1339,3 +1518,17 @@ class ControlPlane:
                 self.ingest("demo-sensor", batch)
             except Exception:
                 log.exception("demo ingest failed")
+
+
+def _plan_dict(p: Plan) -> dict[str, Any]:
+    return {
+        "id": p.plan_id.value,
+        "name": p.name,
+        "nodes_limit": p.nodes_limit,
+        "retention_days": p.retention_days,
+        "llm_advisor_allowed": p.llm_advisor_allowed,
+        "support": p.support,
+        "self_serve": p.self_serve,
+        "price_cents_month": p.price_cents_month,
+        "price_cents_year": p.price_cents_year,
+    }
