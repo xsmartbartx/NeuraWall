@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] — 2026-09-27
+
+### Fixed
+- Release image build: the console is now built once on the native build platform instead of
+  under arm64 emulation, which stalled the multi-arch build.
+
+### Changed
+- CI and release workflows use Node 24 versions of all GitHub Actions.
+- License metadata reflects the proprietary license.
+
 ## [1.0.0] — 2026-09-27
 
 First release.

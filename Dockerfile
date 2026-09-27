@@ -3,7 +3,8 @@
 # (`neurawall agent run`).
 
 # ---------------------------------------------------------------- console build
-FROM node:22-alpine AS console
+# Console assets are architecture-independent: build once, natively, not under emulation.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS console
 WORKDIR /src/console
 COPY console/package.json console/package-lock.json ./
 RUN npm ci --no-audit --no-fund
