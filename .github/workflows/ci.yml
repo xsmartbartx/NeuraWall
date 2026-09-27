@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -48,7 +48,7 @@ jobs:
           --health-cmd "pg_isready -U neurawall" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
       - run: uv sync --frozen --extra postgres
       - run: uv run pytest tests/integration -k "postgres"
         env:
@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
       - name: Python dependency audit
         run: uv export --frozen --no-dev --extra postgres --no-hashes --no-emit-project > requirements.txt && uvx pip-audit -r requirements.txt --strict
       - name: SAST (ruff security rules)
