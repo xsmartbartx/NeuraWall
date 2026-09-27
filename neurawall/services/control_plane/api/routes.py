@@ -383,6 +383,8 @@ def rollback(version: int, body: RollbackIn, cp: CP, actor: Approver) -> dict[st
 
 class EnrollmentTokenIn(Body):
     ttl_seconds: Annotated[int, Field(ge=60, le=7 * 86400)] = 3600
+    #: >1 lets a fleet (e.g. a Kubernetes DaemonSet) enroll with one token.
+    max_uses: Annotated[int, Field(ge=1, le=10000)] = 1
 
 
 @api.get("/nodes", tags=["fleet"])
@@ -393,8 +395,9 @@ def list_nodes(cp: CP, _: Reader) -> list[dict[str, Any]]:
 
 @api.post("/nodes/enrollment-tokens", tags=["fleet"], status_code=201)
 def enrollment_token(body: EnrollmentTokenIn, cp: CP, actor: FleetAdmin) -> dict[str, Any]:
-    return {"token": cp.create_enrollment_token(actor.email, body.ttl_seconds),
-            "expires_in": body.ttl_seconds, "control_plane_url": cp.settings.public_url}
+    return {"token": cp.create_enrollment_token(actor.email, body.ttl_seconds, body.max_uses),
+            "expires_in": body.ttl_seconds, "max_uses": body.max_uses,
+            "control_plane_url": cp.settings.public_url}
 
 
 @api.post("/nodes/{node_id}/revoke", tags=["fleet"])

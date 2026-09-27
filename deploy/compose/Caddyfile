@@ -1,0 +1,11 @@
+# TLS terminates here. For a public domain, Caddy obtains a Let's Encrypt certificate
+# automatically; for "localhost" it uses its internal CA.
+{$NEURAWALL_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy control-plane:8080 {
+		header_up X-Forwarded-Proto {scheme}
+	}
+	request_body {
+		max_size 8MB
+	}
+}

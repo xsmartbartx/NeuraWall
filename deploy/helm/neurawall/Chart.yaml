@@ -1,0 +1,7 @@
+apiVersion: v2
+name: neurawall
+description: NeuraWall AI-assisted firewall — control plane and per-node enforcement agents
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords: [firewall, security, ebpf, nftables, ai]

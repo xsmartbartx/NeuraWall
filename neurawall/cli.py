@@ -27,8 +27,13 @@ def _server(args: argparse.Namespace) -> int:
 def _agent_enroll(args: argparse.Namespace) -> int:
     from neurawall.services.node_agent.agent import AgentConfig, NodeAgent, load_config
 
-    cfg = load_config(Path(args.config)) if args.config else AgentConfig(
-        control_plane_url=args.url, state_dir=Path(args.state_dir), name=args.name or os.uname().nodename)
+    if args.config:
+        cfg = load_config(Path(args.config))
+        if args.name:
+            cfg = cfg.model_copy(update={"name": args.name})
+    else:
+        cfg = AgentConfig(control_plane_url=args.url, state_dir=Path(args.state_dir),
+                          name=args.name or os.uname().nodename)
     token = args.token or os.environ.get("NEURAWALL_ENROLLMENT_TOKEN") or getpass.getpass("Enrollment token: ")
     state = NodeAgent(cfg, backend=None).enroll(token)
     print(f"Enrolled as {state.node_id}. Pinned bundle-signing key {state.signing_key_id}.")

@@ -283,12 +283,13 @@ class ControlPlane:
 
     # ------------------------------------------------------------------ nodes
 
-    def create_enrollment_token(self, actor: str, ttl_seconds: int = 3600) -> str:
+    def create_enrollment_token(self, actor: str, ttl_seconds: int = 3600, max_uses: int = 1) -> str:
         token = "nwe_" + secrets.token_urlsafe(24)
         with self.db.session() as s:
             s.add(db.EnrollmentToken(token_hash=hash_api_key(token), created_by=actor,
-                                     expires_at=time.time() + ttl_seconds))
-        self.audit(actor, "node.enrollment_token", "fleet", {"ttl_seconds": ttl_seconds})
+                                     expires_at=time.time() + ttl_seconds, uses_remaining=max_uses))
+        self.audit(actor, "node.enrollment_token", "fleet",
+                   {"ttl_seconds": ttl_seconds, "max_uses": max_uses})
         return token
 
     def enroll_node(self, token: str, *, name: str, hostname: str, agent_version: str,
@@ -296,12 +297,13 @@ class ControlPlane:
         with self.db.session() as s:
             row = s.scalars(select(db.EnrollmentToken).where(
                 db.EnrollmentToken.token_hash == hash_api_key(token))).first()
-            if row is None or row.used_by_node or row.expires_at < time.time():
+            if row is None or row.uses_remaining <= 0 or row.expires_at < time.time():
                 raise PolicyViolation("enrollment token is invalid, used or expired")
             api_key, key_hash = generate_api_key()
             node = db.Node(id="node-" + secrets.token_hex(6), name=name[:120], hostname=hostname[:253],
                            api_key_hash=key_hash, agent_version=agent_version[:40], backend=backend[:40])
             s.add(node)
+            row.uses_remaining -= 1
             row.used_by_node = node.id
             s.flush()
             s.expunge(node)

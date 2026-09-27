@@ -1,0 +1,34 @@
+[Unit]
+Description=NeuraWall node agent
+Documentation=https://github.com/MiejskiSurfer/NeuraWall/blob/main/docs/deployment.md
+Wants=network-online.target
+After=network-online.target zeek.service
+
+[Service]
+Type=simple
+ExecStart=/opt/neurawall/bin/neurawall agent run --config /etc/neurawall/agent.yaml
+Restart=always
+RestartSec=5
+User=neurawall
+Group=neurawall
+StateDirectory=neurawall-agent
+StateDirectoryMode=0700
+# nftables backend needs CAP_NET_ADMIN only; nothing else.
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX
+ReadOnlyPaths=/etc/neurawall
+ReadWritePaths=/var/lib/neurawall-agent
+Environment=NEURAWALL_LOG_JSON=true
+
+[Install]
+WantedBy=multi-user.target

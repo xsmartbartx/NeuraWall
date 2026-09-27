@@ -1,0 +1,77 @@
+{{- if .Values.agent.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "neurawall.fullname" . }}-agent
+  labels: {{- include "neurawall.labels" . | nindent 4 }}
+data:
+  agent.yaml: |
+    control_plane_url: http://{{ include "neurawall.fullname" . }}.{{ .Release.Namespace }}.svc
+    state_dir: /var/lib/neurawall-agent
+    backend: {{ .Values.agent.backend }}
+    source: {{ .Values.agent.source }}
+    source_path: {{ .Values.agent.sourcePath }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "neurawall.fullname" . }}-agent
+  labels: {{- include "neurawall.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: agent
+  template:
+    metadata:
+      labels: {{- include "neurawall.labels" . | nindent 8 }}
+        app.kubernetes.io/component: agent
+    spec:
+      hostNetwork: {{ eq .Values.agent.backend "nftables" }}
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- with .Values.agent.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: agent
+          image: {{ include "neurawall.image" . }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - >
+              test -f /var/lib/neurawall-agent/agent-state.json ||
+              neurawall agent enroll --config /etc/neurawall/agent.yaml --name "$NODE_NAME";
+              exec neurawall agent run --config /etc/neurawall/agent.yaml
+          env:
+            - name: NODE_NAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+            - name: NEURAWALL_ENROLLMENT_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ .Values.agent.enrollmentTokenSecret }}, key: token, optional: true } }
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+              {{- if eq .Values.agent.backend "nftables" }}
+              add: [NET_ADMIN]
+              {{- end }}
+          resources: {{- toYaml .Values.agent.resources | nindent 12 }}
+          volumeMounts:
+            - { name: config, mountPath: /etc/neurawall, readOnly: true }
+            - { name: state, mountPath: /var/lib/neurawall-agent }
+            - { name: zeek, mountPath: {{ .Values.agent.hostZeekLogDir }}, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: config
+          configMap: { name: {{ include "neurawall.fullname" . }}-agent }
+        - name: state
+          hostPath: { path: /var/lib/neurawall-agent, type: DirectoryOrCreate }
+        - name: zeek
+          hostPath: { path: {{ .Values.agent.hostZeekLogDir }}, type: DirectoryOrCreate }
+{{- end }}

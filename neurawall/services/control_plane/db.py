@@ -5,8 +5,11 @@ from __future__ import annotations
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -66,6 +69,7 @@ class EnrollmentToken(Base):
     created_by: Mapped[str] = mapped_column(String(254))
     created_at: Mapped[float] = mapped_column(Float, default=_now)
     expires_at: Mapped[float] = mapped_column(Float)
+    uses_remaining: Mapped[int] = mapped_column(Integer, default=1)
     used_by_node: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
@@ -198,11 +202,27 @@ def make_engine(url: str) -> Engine:
     return create_engine(url, pool_pre_ping=True, pool_size=10, max_overflow=20)
 
 
+MIGRATIONS_DIR = Path(__file__).parent / "migrations"
+
+
+def alembic_config(connection: Any) -> Config:
+    cfg = Config()
+    cfg.set_main_option("script_location", str(MIGRATIONS_DIR))
+    cfg.attributes["connection"] = connection
+    return cfg
+
+
+def migrate(engine: Engine) -> None:
+    """Bring the schema to the latest revision. Idempotent; safe on every start."""
+    with engine.begin() as conn:
+        command.upgrade(alembic_config(conn), "head")
+
+
 class Database:
     def __init__(self, url: str) -> None:
         self.engine = make_engine(url)
         self._factory = sessionmaker(self.engine, expire_on_commit=False)
-        Base.metadata.create_all(self.engine)
+        migrate(self.engine)
 
     @contextmanager
     def session(self) -> Iterator[Session]:

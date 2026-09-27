@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "sqlalchemy>=2.0.32",
+    "alembic>=1.13",
     "cryptography>=43",
     "pyjwt>=2.9",
     "argon2-cffi>=23.1",

@@ -1,0 +1,30 @@
+# /etc/neurawall/agent.yaml — NeuraWall node agent configuration.
+
+# Control plane URL (HTTPS in production).
+control_plane_url: https://neurawall.example.com
+
+# Holds the node API key (0600), the pinned bundle-signing key and the
+# last-known-good policy bundle. Keep it on persistent storage.
+state_dir: /var/lib/neurawall-agent
+
+name: edge-gw-01
+
+# Enforcement backend:
+#   dry-run  — evaluate and record, never touch the host (safe default)
+#   nftables — enforce via an `inet neurawall` nftables table (needs CAP_NET_ADMIN)
+backend: dry-run
+
+# Flow source:
+#   zeek  — tail Zeek JSON logs (conn/dns/ssl/http); set source_path to Zeek's log dir
+#   jsonl — tail a file of NeuraWall FlowRecord JSON lines
+#   demo  — synthetic traffic for evaluation
+source: zeek
+source_path: /opt/zeek/logs/current
+
+batch_size: 500
+ship_interval_seconds: 2
+bundle_interval_seconds: 30
+heartbeat_interval_seconds: 15
+
+# Private CA for the control plane certificate (optional).
+# ca_bundle: /etc/neurawall/ca.pem

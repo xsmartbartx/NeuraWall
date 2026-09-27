@@ -1,0 +1,83 @@
+# NeuraWall single-host deployment: control plane + PostgreSQL + Caddy (automatic HTTPS).
+#
+#   cp deploy/compose/.env.example .env   # then edit secrets and domain
+#   docker compose up -d
+#   docker compose --profile demo up -d   # also run a demo node agent with synthetic traffic
+#
+name: neurawall
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: neurawall
+      POSTGRES_USER: neurawall
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neurawall -d neurawall"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  control-plane:
+    image: ${NEURAWALL_IMAGE:-neurawall:latest}
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NEURAWALL_ENVIRONMENT: production
+      NEURAWALL_DATABASE_URL: postgresql+psycopg://neurawall:${POSTGRES_PASSWORD}@postgres:5432/neurawall
+      NEURAWALL_PUBLIC_URL: https://${NEURAWALL_DOMAIN:-localhost}
+      NEURAWALL_AUTH__SECRET_KEY: ${NEURAWALL_SECRET_KEY:?set NEURAWALL_SECRET_KEY in .env}
+      NEURAWALL_AUTH__BOOTSTRAP_ADMIN_EMAIL: ${NEURAWALL_ADMIN_EMAIL:-admin@neurawall.local}
+      NEURAWALL_POLICY__REQUIRE_FOUR_EYES: ${NEURAWALL_REQUIRE_FOUR_EYES:-false}
+      NEURAWALL_DEMO_MODE: ${NEURAWALL_DEMO_MODE:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      - cpdata:/data            # bundle-signing key + initial admin password live here: back it up
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [control-plane]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      NEURAWALL_DOMAIN: ${NEURAWALL_DOMAIN:-localhost}
+    volumes:
+      - ./deploy/compose/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  demo-agent:
+    profiles: ["demo"]
+    image: ${NEURAWALL_IMAGE:-neurawall:latest}
+    restart: unless-stopped
+    depends_on: [control-plane]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        test -f /var/lib/neurawall-agent/agent-state.json ||
+        neurawall agent enroll --config /etc/neurawall/agent.yaml --token "$$NEURAWALL_ENROLLMENT_TOKEN";
+        exec neurawall agent run --config /etc/neurawall/agent.yaml
+    environment:
+      NEURAWALL_ENROLLMENT_TOKEN: ${NEURAWALL_DEMO_ENROLLMENT_TOKEN:-}
+    volumes:
+      - ./deploy/compose/agent-demo.yaml:/etc/neurawall/agent.yaml:ro
+      - agentstate:/var/lib/neurawall-agent
+
+volumes:
+  pgdata:
+  cpdata:
+  caddy_data:
+  caddy_config:
+  agentstate:

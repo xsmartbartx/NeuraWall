@@ -1,0 +1,45 @@
+image:
+  repository: ghcr.io/miejskisurfer/neurawall
+  tag: ""            # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+controlPlane:
+  # The control plane keeps Tier 1 baselines and the Tier 3 queue in memory:
+  # run exactly one replica (scale vertically).
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 2Gi }
+  publicUrl: https://neurawall.example.com
+  requireFourEyes: false
+  demoMode: false
+  persistence:
+    size: 5Gi
+    storageClass: ""
+  # Existing secret with keys: secretKey, databaseUrl, and optionally anthropicApiKey.
+  # If empty, the chart creates one from the values below (not recommended for production).
+  existingSecret: ""
+  secretKey: ""
+  databaseUrl: ""       # postgresql+psycopg://user:pass@host:5432/neurawall ; empty = SQLite on the PVC
+  anthropicApiKey: ""
+
+ingress:
+  enabled: false
+  className: ""
+  host: neurawall.example.com
+  tlsSecretName: neurawall-tls
+  annotations: {}
+
+agent:
+  enabled: false
+  # Secret containing key "token": a single-use enrollment token from Console → Fleet.
+  # Each node enrolls once; state persists on the host at /var/lib/neurawall-agent.
+  enrollmentTokenSecret: neurawall-enrollment
+  backend: dry-run      # nftables to enforce (requires NET_ADMIN, hostNetwork)
+  source: zeek
+  sourcePath: /opt/zeek/logs/current
+  hostZeekLogDir: /opt/zeek/logs
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 512Mi }
+  tolerations: []
+  nodeSelector: {}

@@ -1,0 +1,5 @@
+control_plane_url: http://control-plane:8080
+state_dir: /var/lib/neurawall-agent
+name: demo-agent
+backend: dry-run
+source: demo

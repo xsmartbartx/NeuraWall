@@ -189,3 +189,25 @@ def test_triage_skips_enforced_and_dedupes_drafts(cp):
     assert fully_blocked and all(a.draft_id is None for a in fully_blocked)
     matches = [str(d.data["match"]) for d in cp.list_drafts("pending")]
     assert len(matches) == len(set(matches))
+
+
+def test_multi_use_enrollment_token(cp):
+    token = cp.create_enrollment_token("admin", max_uses=2)
+    a, _ = cp.enroll_node(token, name="a", hostname="", agent_version="1", backend="dry-run")
+    b, _ = cp.enroll_node(token, name="b", hostname="", agent_version="1", backend="dry-run")
+    assert a.id != b.id
+    with pytest.raises(PolicyViolation):
+        cp.enroll_node(token, name="c", hostname="", agent_version="1", backend="dry-run")
+
+
+def test_migrations_are_idempotent_and_match_models(tmp_path):
+    from alembic.autogenerate import compare_metadata
+    from alembic.migration import MigrationContext
+
+    from neurawall.services.control_plane.db import Base, Database, migrate
+
+    database = Database(f"sqlite:///{tmp_path / 'm.db'}")
+    migrate(database.engine)  # second run is a no-op
+    with database.engine.connect() as conn:
+        diff = compare_metadata(MigrationContext.configure(conn), Base.metadata)
+    assert diff == [], diff
