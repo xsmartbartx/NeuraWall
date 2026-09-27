@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Logo } from "../components/Layout";
-import { api } from "../lib/api";
+import { api, setToken } from "../lib/api";
 import { useAuth } from "../lib/hooks";
 
 export function Login() {
@@ -50,7 +50,8 @@ export function ForcePasswordChange() {
     e.preventDefault();
     if (next !== confirm) { setError("New passwords do not match"); return; }
     try {
-      await api("/auth/password", { method: "POST", json: { current_password: current, new_password: next } });
+      const res = await api<{ access_token: string }>("/auth/password", { method: "POST", json: { current_password: current, new_password: next } });
+      setToken(res.access_token); // all earlier sessions were revoked
       await refresh();
     } catch (err) { setError((err as Error).message); }
   }

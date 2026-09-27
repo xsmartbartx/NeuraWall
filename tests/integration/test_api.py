@@ -190,3 +190,40 @@ def test_login_rate_limit(client):
             "message"
         ]
     )
+
+
+def test_password_change_revokes_old_sessions_and_returns_new_one(client, tmp_path):
+    import time as _time
+
+    h = login(client)
+    other_device = login(client)
+    _time.sleep(1.1)  # iat has whole-second precision
+    r = client.post(
+        "/api/v1/auth/password",
+        headers=h,
+        json={"current_password": ADMIN[1], "new_password": "Brand-New-Pass-99"},
+    )
+    assert r.status_code == 200
+    fresh = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.get("/api/v1/auth/me", headers=fresh).status_code == 200
+    assert client.get("/api/v1/auth/me", headers=other_device).status_code == 401
+    assert client.get("/api/v1/auth/me", headers=h).status_code == 401
+
+
+def test_disabling_user_revokes_sessions(client):
+    import time as _time
+
+    h = login(client)
+    client.post(
+        "/api/v1/users",
+        headers=h,
+        json={"email": "a@corp.io", "role": "analyst", "password": "Analyst-Pass-12"},
+    )
+    ah = login(client, "a@corp.io", "Analyst-Pass-12")
+    assert client.get("/api/v1/auth/me", headers=ah).status_code == 200
+    uid = next(
+        u["id"] for u in client.get("/api/v1/users", headers=h).json() if u["email"] == "a@corp.io"
+    )
+    _time.sleep(1.1)
+    client.patch(f"/api/v1/users/{uid}", headers=h, json={"active": False})
+    assert client.get("/api/v1/auth/me", headers=ah).status_code == 401

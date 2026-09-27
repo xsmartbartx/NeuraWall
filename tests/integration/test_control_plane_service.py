@@ -236,3 +236,16 @@ def test_migrations_are_idempotent_and_match_models(tmp_path):
     with database.engine.connect() as conn:
         diff = compare_metadata(MigrationContext.configure(conn), Base.metadata)
     assert diff == [], diff
+
+
+def test_bootstrap_password_file_removed_after_first_change(tmp_path):
+    settings = load_settings(environment="test", data_dir=tmp_path)
+    plane = ControlPlane(settings, signer=EphemeralSigner(), advisor_backend=None)
+    f = tmp_path / "initial-admin-password.txt"
+    assert f.exists() and oct(f.stat().st_mode & 0o777) == "0o600"
+    assert oct(tmp_path.stat().st_mode & 0o777) == "0o700"
+    email, password = f.read_text().split()
+    _, user = plane.login(email, password)
+    plane.change_password(user.id, password, "New-Admin-Pass-42")
+    assert not f.exists()
+    plane.stop()

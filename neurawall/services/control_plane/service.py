@@ -105,7 +105,8 @@ class ControlPlane:
         advisor_backend: Backend | str | None = "auto",
     ) -> None:
         self.settings = settings
-        settings.data_dir.mkdir(parents=True, exist_ok=True)
+        settings.data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        settings.data_dir.chmod(0o700)  # database, signing key and bootstrap secret live here
         self.db = db.Database(settings.resolved_database_url)
         self.signer = signer or FileSigner(settings.data_dir / "keys" / "bundle-signing.pem")
         self.anomaly = AnomalyEngine(
@@ -302,6 +303,8 @@ class ControlPlane:
                 u.role = role.value
             if active is not None:
                 u.active = active
+                if not active:
+                    u.sessions_valid_after = time.time()
             if name is not None:
                 u.name = name
             s.flush()
@@ -314,15 +317,29 @@ class ControlPlane:
         )
         return u
 
-    def change_password(self, user_id: int, current: str, new: str) -> None:
+    def issue_session(self, user: db.User) -> str:
+        return issue_token(
+            subject=str(user.id),
+            role=user.role,
+            secret=self.settings.jwt_secret,
+            ttl_seconds=self.settings.auth.access_token_ttl_seconds,
+        )
+
+    def change_password(self, user_id: int, current: str, new: str) -> str:
+        """Change the password, revoke every existing session and return a fresh one."""
         with self.db.session() as s:
             u = s.get(db.User, user_id)
             if u is None or not verify_password(current, u.password_hash):
                 raise PolicyViolation("current password is incorrect")
             u.password_hash = hash_password(new)
             u.must_change_password = False
+            u.sessions_valid_after = time.time()
             email = u.email
+        bootstrap_file = self.settings.data_dir / "initial-admin-password.txt"
+        if email == self.settings.auth.bootstrap_admin_email.lower() and bootstrap_file.exists():
+            bootstrap_file.unlink()
         self.audit(email, "user.password_change", f"user:{user_id}")
+        return self.issue_session(self.get_user(user_id))
 
     def reset_password(self, actor: str, user_id: int) -> str:
         temp = secrets.token_urlsafe(12) + "A1!"
@@ -332,6 +349,7 @@ class ControlPlane:
                 raise NotFound("user not found")
             u.password_hash = hash_password(temp)
             u.must_change_password = True
+            u.sessions_valid_after = time.time()
         self.audit(actor, "user.password_reset", f"user:{user_id}")
         return temp
 

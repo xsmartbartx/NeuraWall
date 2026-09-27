@@ -43,6 +43,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(200))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    #: Sessions issued before this instant are rejected (password change / reset / disable).
+    sessions_valid_after: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     created_at: Mapped[float] = mapped_column(Float, default=_now)
     last_login: Mapped[float | None] = mapped_column(Float, nullable=True)
 

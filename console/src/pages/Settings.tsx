@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Badge, Card, ErrorBox, Loading, PageHead } from "../components/ui";
-import { api, type SystemInfo } from "../lib/api";
+import { api, setToken, type SystemInfo } from "../lib/api";
 import { useAction, useApi, useAuth } from "../lib/hooks";
 
 export function Settings() {
@@ -12,9 +12,9 @@ export function Settings() {
 
   const change = async (e: FormEvent) => {
     e.preventDefault();
-    if (await run(() => api("/auth/password", { method: "POST", json: { current_password: pw.current, new_password: pw.next } }), "Password changed")) {
-      setPw({ current: "", next: "" });
-    }
+    const res = await run(() => api<{ access_token: string }>("/auth/password", { method: "POST", json: { current_password: pw.current, new_password: pw.next } }),
+      "Password changed — other sessions signed out");
+    if (res) { setToken(res.access_token); setPw({ current: "", next: "" }); }
   };
 
   return (

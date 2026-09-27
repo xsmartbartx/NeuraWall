@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from neurawall.core.errors import PolicyViolation
+from neurawall.core.errors import NeuraWallError, PolicyViolation
 from neurawall.security.credentials import API_KEY_PREFIX, decode_token
 from neurawall.security.rbac import Permission, Role, authorize
 from neurawall.services.control_plane import db
@@ -43,8 +43,11 @@ def current_user(
     try:
         claims = decode_token(creds.credentials, secret=cp.settings.jwt_secret)
         user = cp.get_user(int(claims["sub"]))
-    except (PolicyViolation, ValueError, KeyError) as exc:
+    except (NeuraWallError, ValueError, KeyError) as exc:  # includes unknown/disabled user
         raise Unauthenticated("invalid or expired session") from exc
+    # JWT iat has whole-second precision; compare at that precision.
+    if int(claims.get("iat", 0)) < int(user.sessions_valid_after):
+        raise Unauthenticated("session was revoked; sign in again")
     return Principal(user.id, user.email, user.name, Role(user.role), user.must_change_password)
 
 

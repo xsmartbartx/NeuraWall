@@ -133,8 +133,8 @@ def me(user: Annotated[Principal, Depends(current_user)]) -> dict[str, Any]:
 def change_password(
     body: PasswordChangeIn, cp: CP, user: Annotated[Principal, Depends(current_user)]
 ) -> dict[str, str]:
-    cp.change_password(user.user_id, body.current_password, body.new_password)
-    return {"status": "changed"}
+    token = cp.change_password(user.user_id, body.current_password, body.new_password)
+    return {"status": "changed", "access_token": token}
 
 
 # ---------------------------------------------------------------- users
