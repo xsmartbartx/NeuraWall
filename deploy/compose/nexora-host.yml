@@ -1,0 +1,52 @@
+# NeuraWall on the shared NEXORA/Vigilo host (92.5.69.99), behind the shared edge Caddy.
+#
+# Deploy ONLY via the host's locking script (never `docker compose up` directly there):
+#   /opt/nexora/infrastructure/deployment/deploy.sh neurawall control-plane
+#
+# No ports are published: the edge Caddy (edge-caddy-1) joins the `neurawall_default`
+# network and proxies nerawall.onenexora.com -> neurawall-control-plane-1:8080.
+# Secrets live in /opt/neurawall/.env (mode 0600), see .env.example next to this file.
+name: neurawall
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: neurawall
+      POSTGRES_USER: neurawall
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in /opt/neurawall/.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neurawall -d neurawall"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 512m
+
+  control-plane:
+    build:
+      context: ../..
+    image: neurawall:host
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NEURAWALL_ENVIRONMENT: production
+      NEURAWALL_DATABASE_URL: postgresql+psycopg://neurawall:${POSTGRES_PASSWORD}@postgres:5432/neurawall
+      NEURAWALL_PUBLIC_URL: https://${NEURAWALL_DOMAIN:?set NEURAWALL_DOMAIN}
+      NEURAWALL_AUTH__SECRET_KEY: ${NEURAWALL_SECRET_KEY:?set NEURAWALL_SECRET_KEY}
+      NEURAWALL_AUTH__BOOTSTRAP_ADMIN_EMAIL: ${NEURAWALL_ADMIN_EMAIL:-admin@neurawall.local}
+      NEURAWALL_POLICY__REQUIRE_FOUR_EYES: ${NEURAWALL_REQUIRE_FOUR_EYES:-false}
+      NEURAWALL_DEMO_MODE: ${NEURAWALL_DEMO_MODE:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      FORWARDED_ALLOW_IPS: "*"   # only reachable through the edge Caddy on this network
+    volumes:
+      - cpdata:/data            # bundle-signing key: back it up
+    mem_limit: 2g
+
+volumes:
+  pgdata:
+  cpdata:
