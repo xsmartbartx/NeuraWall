@@ -1512,7 +1512,7 @@ class ControlPlane:
         ]
         self.ingest("demo-sensor", warm)
         while not self._stop.wait(2):
-            gen.clock = max(gen.clock, time.time() - 2)
+            gen.pace(60, 2.0)
             batch = [lf.flow for lf in gen.stream(60, attack_rate=0.002)]
             try:
                 self.ingest("demo-sensor", batch)

@@ -101,9 +101,19 @@ class TrafficGenerator:
             f"{r.randint(1, 250)}.{r.randint(1, 250)}"
         )
 
-    def _tick(self, mean_gap: float = 0.05) -> float:
-        self.clock += self.rng.expovariate(1 / mean_gap)
+    #: Mean seconds between generated flows.
+    mean_gap: float = 0.05
+
+    def _tick(self) -> float:
+        self.clock += self.rng.expovariate(1 / self.mean_gap)
         return self.clock
+
+    def pace(self, count: int, window_seconds: float, *, end: float | None = None) -> None:
+        """Spread the next ``count`` flows over the real ``window_seconds`` ending at ``end``
+        (default: now), so live demo traffic never drifts ahead of the wall clock."""
+        end = time.time() if end is None else end
+        self.mean_gap = window_seconds / max(count, 1)
+        self.clock = end - window_seconds
 
     def _flow(self, **kw: object) -> FlowRecord:
         ts = self._tick()

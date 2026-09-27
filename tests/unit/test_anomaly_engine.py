@@ -90,3 +90,13 @@ def test_flood_from_one_source_is_detected():
     flood = gen.scenario("brute_force", 150)
     scores = eng.score_batch(flood)
     assert max(s.score for s in scores[-50:]) >= 0.8
+
+
+def test_paced_generator_never_runs_ahead_of_the_clock():
+    """Regression: live demo timestamps drifted ~34 minutes into the future."""
+    gen = TrafficGenerator(seed=3)
+    for _ in range(200):  # 200 ticks of 60 flows per 2 s, as the demo loop does
+        now = time.time()
+        gen.pace(60, 2.0, end=now)
+        flows = [lf.flow for lf in gen.stream(60, attack_rate=0.01)]
+    assert max(f.ts_start for f in flows) <= now + 5

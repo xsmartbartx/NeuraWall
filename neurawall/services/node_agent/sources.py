@@ -181,8 +181,9 @@ class DemoSource:
             n = min(max_items, int((now - self._last) * self.rate))
             if n <= 0:
                 return []
+            window = now - self._last
             self._last = now
-            self.gen.clock = max(self.gen.clock, time.time() - 2)
+            self.gen.pace(n, window)
             flows = [lf.flow for lf in self.gen.stream(n, attack_rate=self.attack_rate)]
         return [f.model_dump(mode="json") for f in flows]
 
