@@ -113,8 +113,8 @@ class NodeAgent:
         tmp.replace(path)
 
     def _save_state(self) -> None:
-        assert self.state is not None
-        self._write_private(self._state_file, self.state.model_dump_json(indent=1))
+        state = self._enrolled()
+        self._write_private(self._state_file, state.model_dump_json(indent=1))
 
     # ---------------------------------------------------------------- enrollment
 
@@ -142,21 +142,25 @@ class NodeAgent:
         log.info("enrolled", node_id=self.state.node_id, signing_key_id=self.state.signing_key_id)
         return self.state
 
-    def _headers(self) -> dict[str, str]:
+    def _enrolled(self) -> AgentState:
+        # A real check, not an assert: asserts are stripped under `python -O`.
         if self.state is None:
             raise RecoverableError("agent is not enrolled; run `neurawall agent enroll` first")
-        return {"Authorization": f"Bearer {self.state.api_key}"}
+        return self.state
+
+    def _headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self._enrolled().api_key}"}
 
     # ---------------------------------------------------------------- bundles
 
     def _trusted(self) -> dict[str, Any]:
-        assert self.state is not None
-        return {self.state.signing_key_id: load_public_key(self.state.signing_public_key)}
+        state = self._enrolled()
+        return {state.signing_key_id: load_public_key(state.signing_public_key)}
 
     def apply_envelope(self, env: SignedEnvelope, *, persist: bool = True) -> bool:
-        assert self.state is not None
+        state = self._enrolled()
         try:
-            bundle = open_bundle(env, self._trusted(), min_version=self.state.applied_version)
+            bundle = open_bundle(env, self._trusted(), min_version=state.applied_version)
         except IntegrityFailure as exc:
             self.stats["bundle_rejections"] += 1
             log.error("policy bundle rejected; keeping last-known-good", error=exc.message)
@@ -166,7 +170,7 @@ class NodeAgent:
         result = self.backend.apply_bundle(bundle)
         if not result.ok:
             return False
-        self.state.applied_version = bundle.version
+        state.applied_version = bundle.version
         self._save_state()
         if persist:
             self._write_private(self._bundle_file, env.model_dump_json())
@@ -197,14 +201,14 @@ class NodeAgent:
     def ship_flows(self) -> int:
         if self.source is None:
             return 0
-        assert self.state is not None
+        state = self._enrolled()
         docs = self.source.poll(self.cfg.batch_size)
         if not docs:
             return 0
         r = self.http.post(
             "/api/v1/agent/flows",
             headers=self._headers(),
-            json={"applied_version": self.state.applied_version, "flows": docs},
+            json={"applied_version": state.applied_version, "flows": docs},
         )
         r.raise_for_status()
         body = r.json()
@@ -224,7 +228,7 @@ class NodeAgent:
         return len(docs)
 
     def heartbeat(self) -> None:
-        assert self.state is not None
+        state = self._enrolled()
         st = self.backend.state()
         stats = {
             **self.stats,
@@ -237,7 +241,7 @@ class NodeAgent:
             "/api/v1/agent/heartbeat",
             headers=self._headers(),
             json={
-                "applied_version": self.state.applied_version,
+                "applied_version": state.applied_version,
                 "backend": self.backend.name,
                 "stats": stats,
             },
