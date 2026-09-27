@@ -31,22 +31,50 @@ class AuditEntry(BaseModel):
     hash: str
 
 
-def _digest(seq: int, ts: float, actor: str, action: str, target: str,
-            detail: dict[str, Any], prev_hash: str) -> str:
-    body = {"seq": seq, "ts": round(ts, 6), "actor": actor, "action": action,
-            "target": target, "detail": detail, "prev_hash": prev_hash}
+def _digest(
+    seq: int,
+    ts: float,
+    actor: str,
+    action: str,
+    target: str,
+    detail: dict[str, Any],
+    prev_hash: str,
+) -> str:
+    body = {
+        "seq": seq,
+        "ts": round(ts, 6),
+        "actor": actor,
+        "action": action,
+        "target": target,
+        "detail": detail,
+        "prev_hash": prev_hash,
+    }
     return sha256_hex(canonical_json(body))
 
 
-def build_entry(*, prev: AuditEntry | None, ts: float, actor: str, action: str, target: str,
-                detail: dict[str, Any] | None = None) -> AuditEntry:
+def build_entry(
+    *,
+    prev: AuditEntry | None,
+    ts: float,
+    actor: str,
+    action: str,
+    target: str,
+    detail: dict[str, Any] | None = None,
+) -> AuditEntry:
     seq = (prev.seq + 1) if prev else 1
     prev_hash = prev.hash if prev else GENESIS_HASH
     clean = redact(detail or {})
     ts = round(ts, 6)
-    return AuditEntry(seq=seq, ts=ts, actor=actor, action=action, target=target, detail=clean,
-                      prev_hash=prev_hash,
-                      hash=_digest(seq, ts, actor, action, target, clean, prev_hash))
+    return AuditEntry(
+        seq=seq,
+        ts=ts,
+        actor=actor,
+        action=action,
+        target=target,
+        detail=clean,
+        prev_hash=prev_hash,
+        hash=_digest(seq, ts, actor, action, target, clean, prev_hash),
+    )
 
 
 def verify_chain(entries: list[AuditEntry]) -> int:

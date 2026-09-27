@@ -10,7 +10,9 @@ from pydantic import AfterValidator, Field
 
 from neurawall.core.errors import ModelFault, ValidationFailure
 
-_DOMAIN_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?\.)*[a-z0-9_-]{1,63}\.?$")
+_DOMAIN_RE = re.compile(
+    r"^(?=.{1,253}$)([a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?\.)*[a-z0-9_-]{1,63}\.?$"
+)
 _RULE_ID_RE = re.compile(r"^R-[0-9]{6}$")
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 

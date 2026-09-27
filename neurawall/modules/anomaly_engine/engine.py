@@ -80,8 +80,16 @@ class Suppression:
 
 
 class AnomalyEngine:
-    def __init__(self, *, warmup_flows: int = 200, trees: int = 100, reservoir_size: int = 4000,
-                 refit_every: int = 2000, seed: int = 7, max_baselines: int = 100_000) -> None:
+    def __init__(
+        self,
+        *,
+        warmup_flows: int = 200,
+        trees: int = 100,
+        reservoir_size: int = 4000,
+        refit_every: int = 2000,
+        seed: int = 7,
+        max_baselines: int = 100_000,
+    ) -> None:
         self.warmup_flows = warmup_flows
         self.trees = trees
         self.reservoir_size = reservoir_size
@@ -186,7 +194,9 @@ class AnomalyEngine:
         confidence = min(1.0, self._seen / self.warmup_flows) * (1.0 if self.trained else 0.6)
         top = sorted(contributions.items(), key=lambda kv: abs(kv[1]), reverse=True)[:3]
         return AnomalyScore(
-            flow_id=flow.flow_id, score=score, confidence=round(confidence, 3),
+            flow_id=flow.flow_id,
+            score=score,
+            confidence=round(confidence, 3),
             top_features=[Attribution(feature=k, contribution=round(v, 4)) for k, v in top],
             model_version=f"tier1-if{self.trees}",
         )
@@ -218,8 +228,9 @@ class AnomalyEngine:
 
     def _fit(self) -> None:
         data = np.vstack(self._reservoir)
-        forest = IsolationForest(n_estimators=self.trees, random_state=self._seed,
-                                 contamination="auto")
+        forest = IsolationForest(
+            n_estimators=self.trees, random_state=self._seed, contamination="auto"
+        )
         forest.fit(data)
         raw = -forest.score_samples(data)
         self._offset = float(np.quantile(raw, 0.99))

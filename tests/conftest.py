@@ -15,8 +15,16 @@ from neurawall.core.models import (
 
 
 def make_flow(**kw) -> FlowRecord:
-    base = {"src_ip": "10.0.0.5", "dst_ip": "93.184.216.34", "src_port": 51000, "dst_port": 443,
-            "bytes_out": 800, "bytes_in": 5000, "packets_out": 8, "packets_in": 9}
+    base = {
+        "src_ip": "10.0.0.5",
+        "dst_ip": "93.184.216.34",
+        "src_port": 51000,
+        "dst_port": 443,
+        "bytes_out": 800,
+        "bytes_in": 5000,
+        "packets_out": 8,
+        "packets_in": 9,
+    }
     http = kw.pop("http", None)
     dns = kw.pop("dns", None)
     tls = kw.pop("tls", None)
@@ -31,8 +39,13 @@ def make_flow(**kw) -> FlowRecord:
 
 def make_rule(n: int = 1, **kw) -> Rule:
     match = kw.pop("match", None) or RuleMatch(dst_ports=[22])
-    base = {"id": f"R-{n:06d}", "name": f"rule {n}", "rationale": "test", "action": Action.DROP,
-            "match": match}
+    base = {
+        "id": f"R-{n:06d}",
+        "name": f"rule {n}",
+        "rationale": "test",
+        "action": Action.DROP,
+        "match": match,
+    }
     return Rule(**{**base, **kw})
 
 

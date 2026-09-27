@@ -9,8 +9,11 @@ from neurawall.modules.l7_classifier.detectors.base import Finding, calibrated
 
 # JA3 hashes of mainstream browsers (extendable via the model bundle).
 BROWSER_JA3 = {
-    "chrome": {"cd08e31494f9531f560d64c695473da9", "b32309a26951912be7dba376398abc3b",
-               "773906b0efdefa24a7f2b8eb6985bf37"},
+    "chrome": {
+        "cd08e31494f9531f560d64c695473da9",
+        "b32309a26951912be7dba376398abc3b",
+        "773906b0efdefa24a7f2b8eb6985bf37",
+    },
     "firefox": {"579ccef312d18482fc42e2b822ca2430", "b20b44b18b853ef29ab773e921b03422"},
     "safari": {"773906b0efdefa24a7f2b8eb6985bf37"},
     "edge": {"cd08e31494f9531f560d64c695473da9"},
@@ -54,7 +57,11 @@ def detect_exfiltration(flow: FlowRecord) -> list[Finding]:
     total = flow.bytes_out + flow.bytes_in
     ratio = flow.bytes_out / total
     ev: list[tuple[str, float, str | float | None]] = [
-        ("outbound_volume_mb", min(flow.bytes_out / 50_000_000, 3.0), round(flow.bytes_out / 1e6, 1)),
+        (
+            "outbound_volume_mb",
+            min(flow.bytes_out / 50_000_000, 3.0),
+            round(flow.bytes_out / 1e6, 1),
+        ),
     ]
     if ratio > 0.9:
         ev.append(("upload_asymmetry", (ratio - 0.9) * 20, round(ratio, 4)))
@@ -64,7 +71,11 @@ def detect_exfiltration(flow: FlowRecord) -> list[Finding]:
     if flow.direction.value != "outbound":
         return []
     conf = calibrated([w for _, w, _ in ev], -3.0)
-    return [Finding(ThreatLabel.EXFILTRATION, round(conf, 4), "exfiltration", ev)] if conf >= 0.3 else []
+    return (
+        [Finding(ThreatLabel.EXFILTRATION, round(conf, 4), "exfiltration", ev)]
+        if conf >= 0.3
+        else []
+    )
 
 
 def detect_tls_mismatch(flow: FlowRecord) -> list[Finding]:

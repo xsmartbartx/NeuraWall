@@ -18,9 +18,15 @@ def _server(args: argparse.Namespace) -> int:
     from neurawall.services.control_plane.app import create_app
 
     settings = get_settings()
-    uvicorn.run(create_app(settings), host=args.host or settings.host, port=args.port or settings.port,
-                proxy_headers=True, forwarded_allow_ips=os.environ.get("FORWARDED_ALLOW_IPS", "127.0.0.1"),
-                log_config=None, access_log=False)
+    uvicorn.run(
+        create_app(settings),
+        host=args.host or settings.host,
+        port=args.port or settings.port,
+        proxy_headers=True,
+        forwarded_allow_ips=os.environ.get("FORWARDED_ALLOW_IPS", "127.0.0.1"),
+        log_config=None,
+        access_log=False,
+    )
     return 0
 
 
@@ -32,9 +38,16 @@ def _agent_enroll(args: argparse.Namespace) -> int:
         if args.name:
             cfg = cfg.model_copy(update={"name": args.name})
     else:
-        cfg = AgentConfig(control_plane_url=args.url, state_dir=Path(args.state_dir),
-                          name=args.name or os.uname().nodename)
-    token = args.token or os.environ.get("NEURAWALL_ENROLLMENT_TOKEN") or getpass.getpass("Enrollment token: ")
+        cfg = AgentConfig(
+            control_plane_url=args.url,
+            state_dir=Path(args.state_dir),
+            name=args.name or os.uname().nodename,
+        )
+    token = (
+        args.token
+        or os.environ.get("NEURAWALL_ENROLLMENT_TOKEN")
+        or getpass.getpass("Enrollment token: ")
+    )
     state = NodeAgent(cfg, backend=None).enroll(token)
     print(f"Enrolled as {state.node_id}. Pinned bundle-signing key {state.signing_key_id}.")
     print("Verify this key id matches Settings → System in the console before running the agent.")
@@ -45,8 +58,10 @@ def _agent_run(args: argparse.Namespace) -> int:
     from neurawall.core.logging import configure_logging
     from neurawall.services.node_agent.agent import NodeAgent, load_config
 
-    configure_logging(os.environ.get("NEURAWALL_LOG_LEVEL", "INFO"),
-                      json_output=os.environ.get("NEURAWALL_LOG_JSON", "true") == "true")
+    configure_logging(
+        os.environ.get("NEURAWALL_LOG_LEVEL", "INFO"),
+        json_output=os.environ.get("NEURAWALL_LOG_JSON", "true") == "true",
+    )
     NodeAgent(load_config(Path(args.config))).run()
     return 0
 
@@ -58,7 +73,9 @@ def _create_user(args: argparse.Namespace) -> int:
 
     password = os.environ.get("NEURAWALL_NEW_USER_PASSWORD") or getpass.getpass("Password: ")
     cp = ControlPlane(get_settings(), advisor_backend=None)
-    u = cp.create_user("cli", email=args.email, name=args.name or "", role=Role(args.role), password=password)
+    u = cp.create_user(
+        "cli", email=args.email, name=args.name or "", role=Role(args.role), password=password
+    )
     print(f"Created {u.email} ({u.role}); password change required at first login.")
     return 0
 
@@ -93,11 +110,16 @@ def _replay(args: argparse.Namespace) -> int:
         flows += gen.scenario(s, 20)
     with httpx.Client(base_url=args.url, timeout=60) as c:
         for i in range(0, len(flows), 500):
-            r = c.post("/api/v1/agent/flows", headers=headers,
-                       json={"flows": [f.model_dump(mode="json") for f in flows[i:i + 500]]})
+            r = c.post(
+                "/api/v1/agent/flows",
+                headers=headers,
+                json={"flows": [f.model_dump(mode="json") for f in flows[i : i + 500]]},
+            )
             r.raise_for_status()
             body = r.json()
-            print(f"batch {i // 500 + 1}: accepted={body['accepted']} blocked={len(body['verdicts'])}")
+            print(
+                f"batch {i // 500 + 1}: accepted={body['accepted']} blocked={len(body['verdicts'])}"
+            )
     return 0
 
 
@@ -111,7 +133,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--port", type=int)
     s.set_defaults(fn=_server)
 
-    agent = sub.add_parser("agent", help="node agent").add_subparsers(dest="agent_cmd", required=True)
+    agent = sub.add_parser("agent", help="node agent").add_subparsers(
+        dest="agent_cmd", required=True
+    )
     e = agent.add_parser("enroll", help="enroll this node with a control plane")
     e.add_argument("--config", help="agent YAML config (alternative to --url/--state-dir)")
     e.add_argument("--url", default="http://localhost:8080")
@@ -126,8 +150,9 @@ def main(argv: list[str] | None = None) -> int:
     u = sub.add_parser("create-user", help="create a console user")
     u.add_argument("--email", required=True)
     u.add_argument("--name")
-    u.add_argument("--role", default="analyst",
-                   choices=["viewer", "analyst", "operator", "approver", "admin"])
+    u.add_argument(
+        "--role", default="analyst", choices=["viewer", "analyst", "operator", "approver", "admin"]
+    )
     u.set_defaults(fn=_create_user)
 
     v = sub.add_parser("verify-audit", help="verify the tamper-evident audit chain")

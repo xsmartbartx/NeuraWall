@@ -83,19 +83,22 @@ class SourceWindow:
 def extract(flow: FlowRecord, window: SourceWindow) -> np.ndarray:
     conn_rate, port_entropy = window.observe(flow.src_ip, flow.dst_port, flow.ts_start)
     total = flow.bytes_out + flow.bytes_in
-    return np.array([
-        math.log1p(flow.bytes_out),
-        math.log1p(flow.bytes_in),
-        math.log1p(flow.packets_out),
-        math.log1p(flow.packets_in),
-        flow.bytes_out / total if total else 0.5,
-        flow.bytes_out / flow.packets_out if flow.packets_out else 0.0,
-        math.log1p(flow.duration),
-        port_entropy,
-        math.log1p(conn_rate),
-        dns_label_entropy(flow.dns_qname),
-        coefficient_of_variation(flow.inter_arrival_ms),
-    ], dtype=float)
+    return np.array(
+        [
+            math.log1p(flow.bytes_out),
+            math.log1p(flow.bytes_in),
+            math.log1p(flow.packets_out),
+            math.log1p(flow.packets_in),
+            flow.bytes_out / total if total else 0.5,
+            flow.bytes_out / flow.packets_out if flow.packets_out else 0.0,
+            math.log1p(flow.duration),
+            port_entropy,
+            math.log1p(conn_rate),
+            dns_label_entropy(flow.dns_qname),
+            coefficient_of_variation(flow.inter_arrival_ms),
+        ],
+        dtype=float,
+    )
 
 
 def hour_of_week(ts: float) -> int:

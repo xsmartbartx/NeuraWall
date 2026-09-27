@@ -233,7 +233,9 @@ class RuleMatch(Frozen):
     directions: Annotated[list[Direction], Field(max_length=3)] = []
     sni_suffixes: Annotated[list[DomainSuffix], Field(max_length=128)] = []
     dns_suffixes: Annotated[list[DomainSuffix], Field(max_length=128)] = []
-    http_path_prefixes: Annotated[list[Annotated[str, Field(max_length=256)]], Field(max_length=64)] = []
+    http_path_prefixes: Annotated[
+        list[Annotated[str, Field(max_length=256)]], Field(max_length=64)
+    ] = []
     ja3: Annotated[list[Annotated[str, Field(max_length=64)]], Field(max_length=64)] = []
     labels: Annotated[list[ThreatLabel], Field(max_length=16)] = []
     min_label_confidence: Probability = 0.0
@@ -242,8 +244,16 @@ class RuleMatch(Frozen):
     @model_validator(mode="after")
     def _non_empty(self) -> RuleMatch:
         populated = [
-            self.src_cidrs, self.dst_cidrs, self.dst_ports, self.protocols, self.directions,
-            self.sni_suffixes, self.dns_suffixes, self.http_path_prefixes, self.ja3, self.labels,
+            self.src_cidrs,
+            self.dst_cidrs,
+            self.dst_ports,
+            self.protocols,
+            self.directions,
+            self.sni_suffixes,
+            self.dns_suffixes,
+            self.http_path_prefixes,
+            self.ja3,
+            self.labels,
         ]
         if not any(populated) and self.min_anomaly_score is None:
             raise ValueError("rule match must specify at least one criterion")
@@ -359,7 +369,9 @@ class AlertSummary(Frozen):
     title: Annotated[SafeText, Field(max_length=200)]
     summary: Annotated[SafeText, Field(max_length=2000)]
     severity: Severity
-    recommended_actions: Annotated[list[Annotated[SafeText, Field(max_length=300)]], Field(max_length=6)] = []
+    recommended_actions: Annotated[
+        list[Annotated[SafeText, Field(max_length=300)]], Field(max_length=6)
+    ] = []
     source: DraftSource
 
 

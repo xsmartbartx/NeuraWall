@@ -14,7 +14,8 @@ from neurawall.services.control_plane.service import ControlPlane
 @pytest.fixture
 def cp(tmp_path):
     settings = load_settings(
-        environment="test", data_dir=tmp_path,
+        environment="test",
+        data_dir=tmp_path,
         inference={"baseline_warmup_flows": 50, "isolation_forest_trees": 20},
         auth={"bootstrap_admin_password": "Admin-Password-1!"},
         policy={"rollout_stage_seconds": 0},
@@ -74,8 +75,15 @@ def test_blast_radius_gate(cp):
     gen = TrafficGenerator(seed=7)
     warm(cp, gen)
     from neurawall.core.models import DraftSource, RuleDraft
-    broad = RuleDraft(name="block https", rationale="too broad", action=Action.DROP,
-                      match=RuleMatch(dst_ports=[443]), confidence=0.5, source=DraftSource.OPERATOR)
+
+    broad = RuleDraft(
+        name="block https",
+        rationale="too broad",
+        action=Action.DROP,
+        match=RuleMatch(dst_ports=[443]),
+        confidence=0.5,
+        source=DraftSource.OPERATOR,
+    )
     d = cp.create_draft(broad, actor="op@x")
     assert d.simulation.exceeds_threshold
     with pytest.raises(PolicyViolation, match="blast radius"):
@@ -85,14 +93,26 @@ def test_blast_radius_gate(cp):
 
 
 def test_four_eyes(tmp_path):
-    settings = load_settings(environment="test", data_dir=tmp_path,
-                             auth={"bootstrap_admin_password": "Admin-Password-1!"},
-                             policy={"require_four_eyes": True})
+    settings = load_settings(
+        environment="test",
+        data_dir=tmp_path,
+        auth={"bootstrap_admin_password": "Admin-Password-1!"},
+        policy={"require_four_eyes": True},
+    )
     cp = ControlPlane(settings, signer=EphemeralSigner(), advisor_backend=None)
     from neurawall.core.models import DraftSource, RuleDraft
-    d = cp.create_draft(RuleDraft(name="x", rationale="y", action=Action.DROP,
-                                  match=RuleMatch(dst_ports=[4444]), confidence=0.9,
-                                  source=DraftSource.OPERATOR), actor="alice")
+
+    d = cp.create_draft(
+        RuleDraft(
+            name="x",
+            rationale="y",
+            action=Action.DROP,
+            match=RuleMatch(dst_ports=[4444]),
+            confidence=0.9,
+            source=DraftSource.OPERATOR,
+        ),
+        actor="alice",
+    )
     with pytest.raises(PolicyViolation, match="four-eyes"):
         cp.approve_draft("alice", d.draft_id, mode=RuleMode.ENFORCE)
     cp.approve_draft("bob", d.draft_id, mode=RuleMode.ENFORCE)
@@ -101,7 +121,9 @@ def test_four_eyes(tmp_path):
 
 def test_node_enrollment_and_signed_bundle(cp):
     token = cp.create_enrollment_token("admin")
-    node, api_key = cp.enroll_node(token, name="edge-1", hostname="h", agent_version="1", backend="dry-run")
+    node, api_key = cp.enroll_node(
+        token, name="edge-1", hostname="h", agent_version="1", backend="dry-run"
+    )
     with pytest.raises(PolicyViolation):
         cp.enroll_node(token, name="again", hostname="h", agent_version="1", backend="dry-run")
     assert cp.authenticate_node(api_key).id == node.id
@@ -119,6 +141,7 @@ def test_node_enrollment_and_signed_bundle(cp):
 
 def sign_with_other_key(env):
     from neurawall.security.integrity import sign_payload
+
     other = sign_payload(env.payload, EphemeralSigner())
     return {**other.model_dump(), "key_id": env.key_id}
 
@@ -143,7 +166,9 @@ def test_last_admin_protected(cp):
     admin = cp.list_users()[0]
     with pytest.raises(PolicyViolation):
         cp.update_user("admin", admin.id, role=Role.VIEWER)
-    u = cp.create_user("admin", email="v@x.io", name="V", role=Role.VIEWER, password="Viewer-Pass-12")
+    u = cp.create_user(
+        "admin", email="v@x.io", name="V", role=Role.VIEWER, password="Viewer-Pass-12"
+    )
     assert u.must_change_password
 
 

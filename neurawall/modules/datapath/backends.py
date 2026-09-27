@@ -76,8 +76,15 @@ def is_static(rule: Rule) -> bool:
     kernel ruleset does not have, so they are enforced dynamically (never over-block).
     """
     m = rule.match
-    return not (m.sni_suffixes or m.dns_suffixes or m.http_path_prefixes or m.ja3 or m.labels
-                or m.directions or m.min_anomaly_score is not None)
+    return not (
+        m.sni_suffixes
+        or m.dns_suffixes
+        or m.http_path_prefixes
+        or m.ja3
+        or m.labels
+        or m.directions
+        or m.min_anomaly_score is not None
+    )
 
 
 def enforceable(rule: Rule) -> bool:
@@ -143,7 +150,7 @@ def compile_rule(rule: Rule) -> list[str]:
     lines: list[str] = []
     src4, src6 = _family_split(m.src_cidrs)
     dst4, dst6 = _family_split(m.dst_cidrs)
-    families = []
+    families: list[tuple[str | None, list[str], list[str]]] = []
     if (src4 or dst4) and not (src6 or dst6):
         families = [("ip", src4, dst4)]
     elif (src6 or dst6) and not (src4 or dst4):
@@ -152,9 +159,11 @@ def compile_rule(rule: Rule) -> list[str]:
         families = [("ip", src4, dst4), ("ip6", src6, dst6)]
     else:
         families = [(None, [], [])]
-    protos = [p.value for p in m.protocols] or (["tcp", "udp"] if m.dst_ports else [])
+    protos: list[str | None] = [p.value for p in m.protocols] or (
+        ["tcp", "udp"] if m.dst_ports else []
+    )
     for fam, src, dst in families:
-        if fam and (m.src_cidrs and not src or m.dst_cidrs and not dst):
+        if fam and ((m.src_cidrs and not src) or (m.dst_cidrs and not dst)):
             continue  # this family has no addresses for a populated criterion
         for proto in protos or [None]:
             parts: list[str] = []
@@ -174,8 +183,10 @@ def compile_rule(rule: Rule) -> list[str]:
 
 
 def render_ruleset(bundle: PolicyBundle) -> str:
-    rules = sorted((r for r in bundle.rules if enforceable(r) and is_static(r)),
-                   key=lambda r: (r.priority, r.id))
+    rules = sorted(
+        (r for r in bundle.rules if enforceable(r) and is_static(r)),
+        key=lambda r: (r.priority, r.id),
+    )
     # ALLOW rules with higher priority than blocking rules act as exceptions.
     allows = [r for r in bundle.rules if r.enabled and r.action == Action.ALLOW and is_static(r)]
     body: list[str] = []
@@ -185,33 +196,35 @@ def render_ruleset(bundle: PolicyBundle) -> str:
                 line = line.replace("counter drop", "accept")
             body.append(f"    {line}")
     ttl = f"{DYNAMIC_TTL_SECONDS}s"
-    return "\n".join([
-        "table inet neurawall",
-        "delete table inet neurawall",
-        "table inet neurawall {",
-        f"  set dyn_drop4 {{ type ipv4_addr . ipv4_addr . inet_service; flags timeout; timeout {ttl}; }}",
-        f"  set dyn_drop6 {{ type ipv6_addr . ipv6_addr . inet_service; flags timeout; timeout {ttl}; }}",
-        f"  set quarantine4 {{ type ipv4_addr; flags timeout; timeout {ttl}; }}",
-        f"  set quarantine6 {{ type ipv6_addr; flags timeout; timeout {ttl}; }}",
-        "  chain enforce {",
-        "    ip saddr . ip daddr . th dport @dyn_drop4 counter drop",
-        "    ip6 saddr . ip6 daddr . th dport @dyn_drop6 counter drop",
-        "    ip saddr @quarantine4 counter drop",
-        "    ip6 saddr @quarantine6 counter drop",
-        *body,
-        "  }",
-        "  chain forward {",
-        "    type filter hook forward priority filter - 10; policy accept;",
-        "    jump enforce",
-        "  }",
-        "  chain input {",
-        "    type filter hook input priority filter - 10; policy accept;",
-        "    iif lo accept",
-        "    jump enforce",
-        "  }",
-        "}",
-        "",
-    ])
+    return "\n".join(
+        [
+            "table inet neurawall",
+            "delete table inet neurawall",
+            "table inet neurawall {",
+            f"  set dyn_drop4 {{ type ipv4_addr . ipv4_addr . inet_service; flags timeout; timeout {ttl}; }}",
+            f"  set dyn_drop6 {{ type ipv6_addr . ipv6_addr . inet_service; flags timeout; timeout {ttl}; }}",
+            f"  set quarantine4 {{ type ipv4_addr; flags timeout; timeout {ttl}; }}",
+            f"  set quarantine6 {{ type ipv6_addr; flags timeout; timeout {ttl}; }}",
+            "  chain enforce {",
+            "    ip saddr . ip daddr . th dport @dyn_drop4 counter drop",
+            "    ip6 saddr . ip6 daddr . th dport @dyn_drop6 counter drop",
+            "    ip saddr @quarantine4 counter drop",
+            "    ip6 saddr @quarantine6 counter drop",
+            *body,
+            "  }",
+            "  chain forward {",
+            "    type filter hook forward priority filter - 10; policy accept;",
+            "    jump enforce",
+            "  }",
+            "  chain input {",
+            "    type filter hook input priority filter - 10; policy accept;",
+            "    iif lo accept",
+            "    jump enforce",
+            "  }",
+            "}",
+            "",
+        ]
+    )
 
 
 class DryRunBackend:
@@ -251,14 +264,23 @@ class NftablesBackend(DryRunBackend):
 
     def __init__(self, nft_path: str | None = None) -> None:
         super().__init__()
-        self.nft = nft_path or shutil.which("nft")
-        if not self.nft:
-            raise RecoverableError("nft binary not found; install nftables or use the dry-run backend")
+        nft = nft_path or shutil.which("nft")
+        if not nft:
+            raise RecoverableError(
+                "nft binary not found; install nftables or use the dry-run backend"
+            )
+        self.nft: str = nft
         self._state = DatapathState(backend=self.name)
 
     def _run(self, script: str) -> None:
-        proc = subprocess.run([self.nft, "-f", "-"], input=script, text=True,  # noqa: S603
-                              capture_output=True, timeout=15, check=False)
+        proc = subprocess.run(  # noqa: S603 - fixed argv; the script is our own rendered ruleset
+            [self.nft, "-f", "-"],
+            input=script,
+            text=True,
+            capture_output=True,
+            timeout=15,
+            check=False,
+        )
         if proc.returncode != 0:
             raise RecoverableError(f"nft failed: {proc.stderr.strip()[:500]}")
 
@@ -275,7 +297,9 @@ class NftablesBackend(DryRunBackend):
         self.last_ruleset = script
         result = super().apply_bundle(bundle)
         self._state.last_error = None
-        return ApplyResult(True, result.version, result.static_rules, result.dynamic_rules, "applied")
+        return ApplyResult(
+            True, result.version, result.static_rules, result.dynamic_rules, "applied"
+        )
 
     def apply_verdict(self, flow: FlowRecord, verdict: Verdict) -> bool:
         if not super().apply_verdict(flow, verdict):
@@ -284,8 +308,10 @@ class NftablesBackend(DryRunBackend):
         if verdict.action == Action.QUARANTINE:
             element = f"add element inet neurawall quarantine{6 if v6 else 4} {{ {flow.src_ip} }}"
         else:
-            element = (f"add element inet neurawall dyn_drop{6 if v6 else 4} "
-                       f"{{ {flow.src_ip} . {flow.dst_ip} . {flow.dst_port} }}")
+            element = (
+                f"add element inet neurawall dyn_drop{6 if v6 else 4} "
+                f"{{ {flow.src_ip} . {flow.dst_ip} . {flow.dst_port} }}"
+            )
         try:
             self._run(element + "\n")
             return True

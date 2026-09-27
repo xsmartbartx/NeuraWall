@@ -12,11 +12,16 @@ from tests.conftest import make_flow, make_rule
 
 
 def test_compile_static_rules():
-    r = make_rule(1, match=RuleMatch(src_cidrs=["10.0.0.0/8", "2001:db8::/32"], dst_ports=[22],
-                                     protocols=["tcp"]))
+    r = make_rule(
+        1,
+        match=RuleMatch(
+            src_cidrs=["10.0.0.0/8", "2001:db8::/32"], dst_ports=[22], protocols=["tcp"]
+        ),
+    )
     lines = compile_rule(r)
-    assert any(line.startswith("ip saddr { 10.0.0.0/8 }") and "tcp dport { 22 }" in line
-               for line in lines)
+    assert any(
+        line.startswith("ip saddr { 10.0.0.0/8 }") and "tcp dport { 22 }" in line for line in lines
+    )
     assert any(line.startswith("ip6 saddr { 2001:db8::/32 }") for line in lines)
     assert all('comment "R-000001"' in line for line in lines)
 
@@ -33,33 +38,57 @@ def test_render_only_enforced_static_rules():
 
 def test_dry_run_backend_applies_and_caches():
     be = DryRunBackend()
-    res = be.apply_bundle(PolicyBundle(version=3, rules=[make_rule(1), make_rule(
-        2, match=RuleMatch(labels=[ThreatLabel.DGA]))]))
+    res = be.apply_bundle(
+        PolicyBundle(
+            version=3, rules=[make_rule(1), make_rule(2, match=RuleMatch(labels=[ThreatLabel.DGA]))]
+        )
+    )
     assert res.ok and res.static_rules == 1 and res.dynamic_rules == 1
     f = make_flow()
     assert not be.apply_verdict(f, Verdict(flow_id=f.flow_id, action=Action.ALERT, enforced=False))
-    assert be.apply_verdict(f, Verdict(flow_id=f.flow_id, action=Action.DROP, enforced=True,
-                                       rule_id="R-000002"))
+    assert be.apply_verdict(
+        f, Verdict(flow_id=f.flow_id, action=Action.DROP, enforced=True, rule_id="R-000002")
+    )
     assert be.cache.get(f) == (Action.DROP, "R-000002")
     assert be.state().applied_version == 3 and be.state().active_blocks == 1
 
 
 def test_parse_flows_counts_malformed():
-    res = parse_flows([{"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2"}, {"src_ip": "bad"}, "x"],
-                      node_id="n1")
+    res = parse_flows(
+        [{"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2"}, {"src_ip": "bad"}, "x"], node_id="n1"
+    )
     assert len(res.flows) == 1 and res.rejected == 2 and res.flows[0].node_id == "n1"
 
 
 def test_zeek_join(tmp_path):
-    conn = {"ts": 1700000000.5, "uid": "C1", "id.orig_h": "10.0.0.5", "id.orig_p": 50000,
-            "id.resp_h": "93.184.216.34", "id.resp_p": 443, "proto": "tcp", "duration": 1.2,
-            "orig_ip_bytes": 900, "resp_ip_bytes": 5000, "orig_pkts": 8, "resp_pkts": 9,
-            "local_orig": True, "local_resp": False, "history": "ShADadFf"}
+    conn = {
+        "ts": 1700000000.5,
+        "uid": "C1",
+        "id.orig_h": "10.0.0.5",
+        "id.orig_p": 50000,
+        "id.resp_h": "93.184.216.34",
+        "id.resp_p": 443,
+        "proto": "tcp",
+        "duration": 1.2,
+        "orig_ip_bytes": 900,
+        "resp_ip_bytes": 5000,
+        "orig_pkts": 8,
+        "resp_pkts": 9,
+        "local_orig": True,
+        "local_resp": False,
+        "history": "ShADadFf",
+    }
     dns_conn = {**conn, "uid": "C2", "proto": "udp", "id.resp_p": 53}
-    ssl = {"uid": "C1", "server_name": "example.com", "version": "TLSv13",
-           "ja3": "cd08e31494f9531f560d64c695473da9"}
+    ssl = {
+        "uid": "C1",
+        "server_name": "example.com",
+        "version": "TLSv13",
+        "ja3": "cd08e31494f9531f560d64c695473da9",
+    }
     dns = {"uid": "C2", "query": "example.com", "qtype_name": "A", "rcode_name": "NOERROR"}
-    (tmp_path / "conn.log").write_text("\n".join(json.dumps(x) for x in [conn, dns_conn]) + "\n{bad\n")
+    (tmp_path / "conn.log").write_text(
+        "\n".join(json.dumps(x) for x in [conn, dns_conn]) + "\n{bad\n"
+    )
     (tmp_path / "ssl.log").write_text(json.dumps(ssl))
     (tmp_path / "dns.log").write_text(json.dumps(dns))
     res = read_zeek_dir(tmp_path, node_id="sensor-1")

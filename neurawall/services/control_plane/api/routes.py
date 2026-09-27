@@ -91,6 +91,7 @@ def signing_key(cp: CP) -> dict[str, str]:
 
 # ---------------------------------------------------------------- auth
 
+
 class LoginIn(Body):
     email: Annotated[str, Field(max_length=254)]
     password: Annotated[str, Field(max_length=256)]
@@ -108,25 +109,36 @@ def login(body: LoginIn, request: Request, cp: CP) -> dict[str, Any]:
     if not limiter.allow(client) or not limiter.allow("user:" + body.email.lower()):
         raise PolicyViolation("too many login attempts; try again in a minute")
     token, user = cp.login(body.email, body.password)
-    return {"access_token": token, "token_type": "bearer",
-            "expires_in": cp.settings.auth.access_token_ttl_seconds, "user": ser.user(user)}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": cp.settings.auth.access_token_ttl_seconds,
+        "user": ser.user(user),
+    }
 
 
 @api.get("/auth/me", tags=["auth"])
 def me(user: Annotated[Principal, Depends(current_user)]) -> dict[str, Any]:
-    return {"id": user.user_id, "email": user.email, "name": user.name, "role": user.role.value,
-            "must_change_password": user.must_change_password,
-            "permissions": sorted(p.value for p in permissions_for(user.role))}
+    return {
+        "id": user.user_id,
+        "email": user.email,
+        "name": user.name,
+        "role": user.role.value,
+        "must_change_password": user.must_change_password,
+        "permissions": sorted(p.value for p in permissions_for(user.role)),
+    }
 
 
 @api.post("/auth/password", tags=["auth"])
-def change_password(body: PasswordChangeIn, cp: CP,
-                    user: Annotated[Principal, Depends(current_user)]) -> dict[str, str]:
+def change_password(
+    body: PasswordChangeIn, cp: CP, user: Annotated[Principal, Depends(current_user)]
+) -> dict[str, str]:
     cp.change_password(user.user_id, body.current_password, body.new_password)
     return {"status": "changed"}
 
 
 # ---------------------------------------------------------------- users
+
 
 class UserIn(Body):
     email: EmailStr
@@ -148,14 +160,18 @@ def list_users(cp: CP, _: UserAdmin) -> list[dict[str, Any]]:
 
 @api.post("/users", tags=["users"], status_code=201)
 def create_user(body: UserIn, cp: CP, actor: UserAdmin) -> dict[str, Any]:
-    return ser.user(cp.create_user(actor.email, email=body.email, name=body.name, role=body.role,
-                                   password=body.password))
+    return ser.user(
+        cp.create_user(
+            actor.email, email=body.email, name=body.name, role=body.role, password=body.password
+        )
+    )
 
 
 @api.patch("/users/{user_id}", tags=["users"])
 def patch_user(user_id: int, body: UserPatch, cp: CP, actor: UserAdmin) -> dict[str, Any]:
-    return ser.user(cp.update_user(actor.email, user_id, role=body.role, active=body.active,
-                                   name=body.name))
+    return ser.user(
+        cp.update_user(actor.email, user_id, role=body.role, active=body.active, name=body.name)
+    )
 
 
 @api.post("/users/{user_id}/reset-password", tags=["users"])
@@ -165,16 +181,21 @@ def reset_password(user_id: int, cp: CP, actor: UserAdmin) -> dict[str, str]:
 
 # ---------------------------------------------------------------- dashboard
 
+
 @api.get("/dashboard", tags=["dashboard"])
-def dashboard(cp: CP, _: Reader, hours: Annotated[int, Query(ge=1, le=24 * 30)] = 24) -> dict[str, Any]:
+def dashboard(
+    cp: CP, _: Reader, hours: Annotated[int, Query(ge=1, le=24 * 30)] = 24
+) -> dict[str, Any]:
     return cp.dashboard(hours)
 
 
 # ---------------------------------------------------------------- flows
 
+
 @api.get("/flows", tags=["flows"])
 def list_flows(
-    cp: CP, _: Reader,
+    cp: CP,
+    _: Reader,
     q: Annotated[str | None, Query(max_length=253)] = None,
     action: Annotated[str | None, Query(max_length=16)] = None,
     label: Annotated[str | None, Query(max_length=40)] = None,
@@ -188,8 +209,14 @@ def list_flows(
     stmt = select(db.FlowRow).where(db.FlowRow.ts >= time.time() - hours * 3600)
     if q:
         like = f"%{q}%"
-        stmt = stmt.where(or_(db.FlowRow.src_ip == q, db.FlowRow.dst_ip == q,
-                              db.FlowRow.host.like(like), db.FlowRow.flow_id == q))
+        stmt = stmt.where(
+            or_(
+                db.FlowRow.src_ip == q,
+                db.FlowRow.dst_ip == q,
+                db.FlowRow.host.like(like),
+                db.FlowRow.flow_id == q,
+            )
+        )
     if action == "blocked":
         stmt = stmt.where(db.FlowRow.enforced.is_(True))
     elif action:
@@ -221,15 +248,21 @@ def explain_flow(flow_id: str, cp: CP, _: AdvisorUser) -> dict[str, Any]:
 
 # ---------------------------------------------------------------- alerts
 
+
 class AlertPatch(Body):
     status: Literal["open", "acknowledged", "resolved", "false_positive"] | None = None
     assignee: Annotated[str, Field(max_length=254)] | None = None
 
 
 @api.get("/alerts", tags=["alerts"])
-def list_alerts(cp: CP, _: Reader, status: str | None = None, severity: str | None = None,
-                limit: Annotated[int, Query(ge=1, le=500)] = 100,
-                offset: Annotated[int, Query(ge=0)] = 0) -> dict[str, Any]:
+def list_alerts(
+    cp: CP,
+    _: Reader,
+    status: str | None = None,
+    severity: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> dict[str, Any]:
     rows, total = cp.list_alerts(status=status, severity=severity, limit=limit, offset=offset)
     return {"total": total, "items": [ser.alert(a) for a in rows]}
 
@@ -241,7 +274,9 @@ def get_alert(alert_id: int, cp: CP, _: Reader) -> dict[str, Any]:
 
 @api.patch("/alerts/{alert_id}", tags=["alerts"])
 def patch_alert(alert_id: int, body: AlertPatch, cp: CP, actor: Triager) -> dict[str, Any]:
-    return ser.alert(cp.update_alert(actor.email, alert_id, status=body.status, assignee=body.assignee))
+    return ser.alert(
+        cp.update_alert(actor.email, alert_id, status=body.status, assignee=body.assignee)
+    )
 
 
 @api.post("/alerts/{alert_id}/triage", tags=["alerts", "advisor"])
@@ -255,6 +290,7 @@ def narrate_alert(alert_id: int, cp: CP, actor: AdvisorUser) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------- rules
+
 
 class RulePatch(Body):
     enabled: bool | None = None
@@ -279,8 +315,9 @@ def get_rule(rule_id: str, cp: CP, _: Reader) -> dict[str, Any]:
 
 @api.patch("/rules/{rule_id}", tags=["rules"])
 def patch_rule(rule_id: str, body: RulePatch, cp: CP, actor: Approver) -> dict[str, Any]:
-    return cp.update_rule(actor.email, rule_id, enabled=body.enabled, mode=body.mode,
-                          priority=body.priority).model_dump(mode="json")
+    return cp.update_rule(
+        actor.email, rule_id, enabled=body.enabled, mode=body.mode, priority=body.priority
+    ).model_dump(mode="json")
 
 
 @api.delete("/rules/{rule_id}", tags=["rules"], status_code=204)
@@ -289,6 +326,7 @@ def delete_rule(rule_id: str, cp: CP, actor: Approver) -> None:
 
 
 # ---------------------------------------------------------------- drafts
+
 
 class DraftIn(Body):
     name: Annotated[str, Field(min_length=1, max_length=120)]
@@ -327,9 +365,15 @@ def get_draft(draft_id: str, cp: CP, _: Reader) -> dict[str, Any]:
 
 @api.post("/drafts", tags=["drafts"], status_code=201)
 def create_draft(body: DraftIn, cp: CP, actor: Author) -> dict[str, Any]:
-    draft = RuleDraft(name=body.name, rationale=body.rationale, action=body.action,
-                      priority=body.priority, match=body.match, confidence=1.0,
-                      source=DraftSource.OPERATOR)
+    draft = RuleDraft(
+        name=body.name,
+        rationale=body.rationale,
+        action=body.action,
+        priority=body.priority,
+        match=body.match,
+        confidence=1.0,
+        source=DraftSource.OPERATOR,
+    )
     created = cp.create_draft(draft, actor=actor.email)
     return ser.draft(cp.get_draft(created.draft_id))
 
@@ -341,9 +385,15 @@ def simulate_draft(body: SimulateIn, cp: CP, _: Reader) -> dict[str, Any]:
 
 @api.post("/drafts/{draft_id}/approve", tags=["drafts"])
 def approve_draft(draft_id: str, body: ApproveIn, cp: CP, actor: Approver) -> dict[str, Any]:
-    rule = cp.approve_draft(actor.email, draft_id, mode=body.mode, note=body.note, name=body.name,
-                            priority=body.priority,
-                            acknowledge_blast_radius=body.acknowledge_blast_radius)
+    rule = cp.approve_draft(
+        actor.email,
+        draft_id,
+        mode=body.mode,
+        note=body.note,
+        name=body.name,
+        priority=body.priority,
+        acknowledge_blast_radius=body.acknowledge_blast_radius,
+    )
     return rule.model_dump(mode="json")
 
 
@@ -354,6 +404,7 @@ def reject_draft(draft_id: str, body: RejectIn, cp: CP, actor: Approver) -> dict
 
 
 # ---------------------------------------------------------------- bundles
+
 
 class RollbackIn(Body):
     reason: Annotated[str, Field(min_length=1, max_length=500)]
@@ -376,10 +427,14 @@ def advance(version: int, cp: CP, actor: Approver) -> dict[str, Any]:
 
 @api.post("/bundles/{version}/rollback", tags=["bundles"])
 def rollback(version: int, body: RollbackIn, cp: CP, actor: Approver) -> dict[str, Any]:
-    return {"status": "rolled_back", "new_version": cp.rollback_bundle(actor.email, version, body.reason)}
+    return {
+        "status": "rolled_back",
+        "new_version": cp.rollback_bundle(actor.email, version, body.reason),
+    }
 
 
 # ---------------------------------------------------------------- fleet (operator side)
+
 
 class EnrollmentTokenIn(Body):
     ttl_seconds: Annotated[int, Field(ge=60, le=7 * 86400)] = 3600
@@ -395,9 +450,12 @@ def list_nodes(cp: CP, _: Reader) -> list[dict[str, Any]]:
 
 @api.post("/nodes/enrollment-tokens", tags=["fleet"], status_code=201)
 def enrollment_token(body: EnrollmentTokenIn, cp: CP, actor: FleetAdmin) -> dict[str, Any]:
-    return {"token": cp.create_enrollment_token(actor.email, body.ttl_seconds, body.max_uses),
-            "expires_in": body.ttl_seconds, "max_uses": body.max_uses,
-            "control_plane_url": cp.settings.public_url}
+    return {
+        "token": cp.create_enrollment_token(actor.email, body.ttl_seconds, body.max_uses),
+        "expires_in": body.ttl_seconds,
+        "max_uses": body.max_uses,
+        "control_plane_url": cp.settings.public_url,
+    }
 
 
 @api.post("/nodes/{node_id}/revoke", tags=["fleet"])
@@ -408,10 +466,15 @@ def revoke_node(node_id: str, cp: CP, actor: FleetAdmin) -> dict[str, str]:
 
 # ---------------------------------------------------------------- audit
 
+
 @api.get("/audit", tags=["audit"])
-def list_audit(cp: CP, _: Auditor, limit: Annotated[int, Query(ge=1, le=500)] = 100,
-               offset: Annotated[int, Query(ge=0)] = 0,
-               action: Annotated[str | None, Query(max_length=100)] = None) -> dict[str, Any]:
+def list_audit(
+    cp: CP,
+    _: Auditor,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    action: Annotated[str | None, Query(max_length=100)] = None,
+) -> dict[str, Any]:
     stmt = select(db.AuditRow)
     if action:
         stmt = stmt.where(db.AuditRow.action.startswith(action))
@@ -455,15 +518,27 @@ class FlowBatchIn(Body):
 
 @agent.post("/enroll", status_code=201)
 def enroll(body: EnrollIn, cp: CP) -> dict[str, Any]:
-    node, api_key = cp.enroll_node(body.token, name=body.name, hostname=body.hostname,
-                                   agent_version=body.agent_version, backend=body.backend)
+    node, api_key = cp.enroll_node(
+        body.token,
+        name=body.name,
+        hostname=body.hostname,
+        agent_version=body.agent_version,
+        backend=body.backend,
+    )
     kid, pem = cp.public_key()
-    return {"node_id": node.id, "api_key": api_key, "signing_key_id": kid, "signing_public_key": pem}
+    return {
+        "node_id": node.id,
+        "api_key": api_key,
+        "signing_key_id": kid,
+        "signing_public_key": pem,
+    }
 
 
 @agent.post("/heartbeat")
 def heartbeat(body: HeartbeatIn, cp: CP, node: NodeAuth) -> dict[str, Any]:
-    cp.heartbeat(node.id, applied_version=body.applied_version, backend=body.backend, stats=body.stats)
+    cp.heartbeat(
+        node.id, applied_version=body.applied_version, backend=body.backend, stats=body.stats
+    )
     return {"latest_version": cp.bundle_for_node(node.id).payload.get("version")}
 
 
@@ -479,9 +554,18 @@ def ingest_flows(body: FlowBatchIn, cp: CP, node: NodeAuth) -> dict[str, Any]:
     outcome = cp.ingest(node.id, parsed.flows, node_version=body.applied_version or None)
     by_id = {f.flow_id: f for f in parsed.flows}
     return {
-        "accepted": outcome.accepted, "rejected": parsed.rejected, "errors": parsed.errors,
+        "accepted": outcome.accepted,
+        "rejected": parsed.rejected,
+        "errors": parsed.errors,
         "bundle_version": outcome.bundle_version,
-        "verdicts": [{"flow": by_id[v.flow_id].model_dump(mode="json", include={
-            "flow_id", "src_ip", "dst_ip", "dst_port", "protocol"}),
-            "verdict": v.model_dump(mode="json")} for v in outcome.verdicts if v.flow_id in by_id],
+        "verdicts": [
+            {
+                "flow": by_id[v.flow_id].model_dump(
+                    mode="json", include={"flow_id", "src_ip", "dst_ip", "dst_port", "protocol"}
+                ),
+                "verdict": v.model_dump(mode="json"),
+            }
+            for v in outcome.verdicts
+            if v.flow_id in by_id
+        ],
     }

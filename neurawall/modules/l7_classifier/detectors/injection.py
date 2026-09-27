@@ -26,8 +26,13 @@ _SQLI = [
     ("sql_keywords", re.compile(r"\bselect\b.+\bfrom\b"), 1.5),
 ]
 _CMDI = [
-    ("cmd_separator_exec", re.compile(
-        r"(;|\|\|?|&&|`|\$\()\s*(cat|ls|id|whoami|uname|wget|curl|nc|bash|sh|python|perl|chmod|rm)\b"), 3.5),
+    (
+        "cmd_separator_exec",
+        re.compile(
+            r"(;|\|\|?|&&|`|\$\()\s*(cat|ls|id|whoami|uname|wget|curl|nc|bash|sh|python|perl|chmod|rm)\b"
+        ),
+        3.5,
+    ),
     ("cmd_reverse_shell", re.compile(r"(\bnc\b.*-e|/bin/(ba)?sh|/dev/tcp/)"), 3.5),
     ("cmd_sensitive_file", re.compile(r"/etc/(passwd|shadow|hosts)|\bwin\.ini\b"), 2.0),
 ]
@@ -45,8 +50,11 @@ _XSS = [
     ("xss_event_handler", re.compile(r"\bon(error|load|mouseover|focus)\s*="), 2.8),
     ("xss_js_uri", re.compile(r"javascript\s*:"), 2.5),
 ]
-_SCANNER_UA = re.compile(r"(sqlmap|nikto|nmap|masscan|acunetix|nessus|wpscan|dirbuster|gobuster|"
-                         r"nuclei|zgrab|hydra)", re.I)
+_SCANNER_UA = re.compile(
+    r"(sqlmap|nikto|nmap|masscan|acunetix|nessus|wpscan|dirbuster|gobuster|"
+    r"nuclei|zgrab|hydra)",
+    re.I,
+)
 
 _GROUPS: list[tuple[ThreatLabel, list[tuple[str, re.Pattern[str], float]], float]] = [
     (ThreatLabel.SQL_INJECTION, _SQLI, -3.0),

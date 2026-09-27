@@ -43,29 +43,49 @@ class PolicyEngine:
                 continue
             if rule.mode == RuleMode.ALERT_ONLY and rule.action != Action.ALLOW:
                 return Verdict(
-                    flow_id=ev.flow.flow_id, action=Action.ALERT, rule_id=rule.id, enforced=False,
-                    reasons=[f"{rule.id} '{rule.name}' matched (alert-only; would {rule.action})",
-                             *signal_reasons],
-                    anomaly_score=score, labels=labels,
+                    flow_id=ev.flow.flow_id,
+                    action=Action.ALERT,
+                    rule_id=rule.id,
+                    enforced=False,
+                    reasons=[
+                        f"{rule.id} '{rule.name}' matched (alert-only; would {rule.action})",
+                        *signal_reasons,
+                    ],
+                    anomaly_score=score,
+                    labels=labels,
                 )
             return Verdict(
-                flow_id=ev.flow.flow_id, action=rule.action, rule_id=rule.id,
+                flow_id=ev.flow.flow_id,
+                action=rule.action,
+                rule_id=rule.id,
                 enforced=rule.action.is_blocking,
                 reasons=[f"{rule.id} '{rule.name}' matched", *signal_reasons],
-                anomaly_score=score, labels=labels,
+                anomaly_score=score,
+                labels=labels,
             )
 
         # No rule matched: models may raise an alert, never block.
         if self._signals_warrant_alert(ev):
             return Verdict(
-                flow_id=ev.flow.flow_id, action=Action.ALERT, rule_id=None, enforced=False,
-                reasons=["no rule matched; inference signals exceed alert threshold",
-                         *signal_reasons],
-                anomaly_score=score, labels=labels,
+                flow_id=ev.flow.flow_id,
+                action=Action.ALERT,
+                rule_id=None,
+                enforced=False,
+                reasons=[
+                    "no rule matched; inference signals exceed alert threshold",
+                    *signal_reasons,
+                ],
+                anomaly_score=score,
+                labels=labels,
             )
         return Verdict(
-            flow_id=ev.flow.flow_id, action=self.bundle.default_action, rule_id=None,
-            enforced=False, reasons=["default policy"], anomaly_score=score, labels=labels,
+            flow_id=ev.flow.flow_id,
+            action=self.bundle.default_action,
+            rule_id=None,
+            enforced=False,
+            reasons=["default policy"],
+            anomaly_score=score,
+            labels=labels,
         )
 
     def _signals_warrant_alert(self, ev: Evidence) -> bool:

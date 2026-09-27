@@ -35,14 +35,24 @@ class Permission(StrEnum):
 _GRANTS: dict[Role, frozenset[Permission]] = {
     Role.VIEWER: frozenset({Permission.READ}),
     Role.ANALYST: frozenset({Permission.READ, Permission.TRIAGE_ALERTS, Permission.USE_ADVISOR}),
-    Role.OPERATOR: frozenset({
-        Permission.READ, Permission.TRIAGE_ALERTS, Permission.USE_ADVISOR,
-        Permission.AUTHOR_RULES, Permission.MANAGE_FLEET,
-    }),
-    Role.APPROVER: frozenset({
-        Permission.READ, Permission.TRIAGE_ALERTS, Permission.USE_ADVISOR,
-        Permission.APPROVE_RULES, Permission.READ_AUDIT,
-    }),
+    Role.OPERATOR: frozenset(
+        {
+            Permission.READ,
+            Permission.TRIAGE_ALERTS,
+            Permission.USE_ADVISOR,
+            Permission.AUTHOR_RULES,
+            Permission.MANAGE_FLEET,
+        }
+    ),
+    Role.APPROVER: frozenset(
+        {
+            Permission.READ,
+            Permission.TRIAGE_ALERTS,
+            Permission.USE_ADVISOR,
+            Permission.APPROVE_RULES,
+            Permission.READ_AUDIT,
+        }
+    ),
     Role.ADMIN: frozenset(Permission),
 }
 

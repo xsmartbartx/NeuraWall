@@ -35,21 +35,30 @@ def verify_password(password: str, password_hash: str) -> bool:
 def validate_password_strength(password: str) -> None:
     if len(password) < MIN_PASSWORD_LENGTH:
         raise PolicyViolation(f"password must be at least {MIN_PASSWORD_LENGTH} characters")
-    classes = sum([
-        any(c.islower() for c in password),
-        any(c.isupper() for c in password),
-        any(c.isdigit() for c in password),
-        any(not c.isalnum() for c in password),
-    ])
+    classes = sum(
+        [
+            any(c.islower() for c in password),
+            any(c.isupper() for c in password),
+            any(c.isdigit() for c in password),
+            any(not c.isalnum() for c in password),
+        ]
+    )
     if classes < 3:
         raise PolicyViolation("password must mix at least three of: lower, upper, digit, symbol")
 
 
-def issue_token(*, subject: str, role: str, secret: str, ttl_seconds: int,
-                extra: dict[str, Any] | None = None) -> str:
+def issue_token(
+    *, subject: str, role: str, secret: str, ttl_seconds: int, extra: dict[str, Any] | None = None
+) -> str:
     now = int(time.time())
-    claims = {"sub": subject, "role": role, "iat": now, "exp": now + ttl_seconds,
-              "jti": secrets.token_hex(8), **(extra or {})}
+    claims = {
+        "sub": subject,
+        "role": role,
+        "iat": now,
+        "exp": now + ttl_seconds,
+        "jti": secrets.token_hex(8),
+        **(extra or {}),
+    }
     return jwt.encode(claims, secret, algorithm=_JWT_ALG)
 
 

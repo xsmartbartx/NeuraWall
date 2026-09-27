@@ -75,8 +75,11 @@ class RedactionFilter(logging.Filter):
         if isinstance(record.msg, str):
             record.msg = redact_text(record.msg)
         if record.args:
-            record.args = tuple(redact(a) for a in record.args) if isinstance(record.args, tuple) \
+            record.args = (
+                tuple(redact(a) for a in record.args)
+                if isinstance(record.args, tuple)
                 else redact(record.args)
+            )
         fields = getattr(record, "fields", None)
         if fields is not None:
             record.fields = redact(fields)
@@ -104,8 +107,10 @@ class JsonFormatter(logging.Formatter):
 
 class TextFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        base = f"{self.formatTime(record)} {record.levelname:<7} {record.name} " \
-               f"[{getattr(record, 'trace_id', '-')}] {record.getMessage()}"
+        base = (
+            f"{self.formatTime(record)} {record.levelname:<7} {record.name} "
+            f"[{getattr(record, 'trace_id', '-')}] {record.getMessage()}"
+        )
         fields = getattr(record, "fields", None)
         if fields:
             base += " " + json.dumps(fields, default=str)

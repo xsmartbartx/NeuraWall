@@ -64,18 +64,30 @@ class AgentState(BaseModel):
 
 
 class NodeAgent:
-    def __init__(self, cfg: AgentConfig, backend: EnforcementBackend | None = None,
-                 source: FlowSource | None = None, http: httpx.Client | None = None) -> None:
+    def __init__(
+        self,
+        cfg: AgentConfig,
+        backend: EnforcementBackend | None = None,
+        source: FlowSource | None = None,
+        http: httpx.Client | None = None,
+    ) -> None:
         self.cfg = cfg
         self.backend = backend or make_backend(cfg.backend)
         self.http = http or httpx.Client(
-            base_url=cfg.control_plane_url.rstrip("/"), timeout=20.0,
-            verify=False if cfg.insecure_skip_tls_verify else (cfg.ca_bundle or True))  # noqa: S501
+            base_url=cfg.control_plane_url.rstrip("/"),
+            timeout=20.0,
+            verify=False if cfg.insecure_skip_tls_verify else (cfg.ca_bundle or True),
+        )
         self.state: AgentState | None = self._load_state()
         self.source = source
         self._stop = threading.Event()
-        self.stats = {"flows_sent": 0, "flows_rejected": 0, "verdicts_applied": 0,
-                      "bundle_rejections": 0, "last_sync_error": None}
+        self.stats: dict[str, Any] = {
+            "flows_sent": 0,
+            "flows_rejected": 0,
+            "verdicts_applied": 0,
+            "bundle_rejections": 0,
+            "last_sync_error": None,
+        }
 
     # ---------------------------------------------------------------- state
 
@@ -107,15 +119,25 @@ class NodeAgent:
     # ---------------------------------------------------------------- enrollment
 
     def enroll(self, token: str) -> AgentState:
-        r = self.http.post("/api/v1/agent/enroll", json={
-            "token": token, "name": self.cfg.name, "hostname": socket.gethostname(),
-            "agent_version": __version__, "backend": self.backend.name})
+        r = self.http.post(
+            "/api/v1/agent/enroll",
+            json={
+                "token": token,
+                "name": self.cfg.name,
+                "hostname": socket.gethostname(),
+                "agent_version": __version__,
+                "backend": self.backend.name,
+            },
+        )
         if r.status_code != 201:
             raise RecoverableError(f"enrollment failed ({r.status_code}): {r.text[:300]}")
         body = r.json()
-        self.state = AgentState(node_id=body["node_id"], api_key=body["api_key"],
-                                signing_key_id=body["signing_key_id"],
-                                signing_public_key=body["signing_public_key"])
+        self.state = AgentState(
+            node_id=body["node_id"],
+            api_key=body["api_key"],
+            signing_key_id=body["signing_key_id"],
+            signing_public_key=body["signing_public_key"],
+        )
         self._save_state()
         log.info("enrolled", node_id=self.state.node_id, signing_key_id=self.state.signing_key_id)
         return self.state
@@ -148,8 +170,13 @@ class NodeAgent:
         self._save_state()
         if persist:
             self._write_private(self._bundle_file, env.model_dump_json())
-        log.info("policy bundle applied", version=bundle.version, static=result.static_rules,
-                 dynamic=result.dynamic_rules, backend=self.backend.name)
+        log.info(
+            "policy bundle applied",
+            version=bundle.version,
+            static=result.static_rules,
+            dynamic=result.dynamic_rules,
+            backend=self.backend.name,
+        )
         return True
 
     def restore_last_known_good(self) -> None:
@@ -174,16 +201,24 @@ class NodeAgent:
         docs = self.source.poll(self.cfg.batch_size)
         if not docs:
             return 0
-        r = self.http.post("/api/v1/agent/flows", headers=self._headers(), json={
-            "applied_version": self.state.applied_version, "flows": docs})
+        r = self.http.post(
+            "/api/v1/agent/flows",
+            headers=self._headers(),
+            json={"applied_version": self.state.applied_version, "flows": docs},
+        )
         r.raise_for_status()
         body = r.json()
         self.stats["flows_sent"] += body["accepted"]
         self.stats["flows_rejected"] += body["rejected"]
         for item in body.get("verdicts", []):
             f, v = item["flow"], Verdict.model_validate(item["verdict"])
-            flow = FlowRecord(flow_id=f["flow_id"], src_ip=f["src_ip"], dst_ip=f["dst_ip"],
-                              dst_port=f["dst_port"], protocol=f["protocol"])
+            flow = FlowRecord(
+                flow_id=f["flow_id"],
+                src_ip=f["src_ip"],
+                dst_ip=f["dst_ip"],
+                dst_port=f["dst_port"],
+                protocol=f["protocol"],
+            )
             if self.backend.apply_verdict(flow, v):
                 self.stats["verdicts_applied"] += 1
         return len(docs)
@@ -191,11 +226,22 @@ class NodeAgent:
     def heartbeat(self) -> None:
         assert self.state is not None
         st = self.backend.state()
-        stats = {**self.stats, "active_blocks": st.active_blocks, "static_rules": st.static_rules,
-                 "dynamic_rules": st.dynamic_rules, "datapath_error": st.last_error}
-        r = self.http.post("/api/v1/agent/heartbeat", headers=self._headers(), json={
-            "applied_version": self.state.applied_version, "backend": self.backend.name,
-            "stats": stats})
+        stats = {
+            **self.stats,
+            "active_blocks": st.active_blocks,
+            "static_rules": st.static_rules,
+            "dynamic_rules": st.dynamic_rules,
+            "datapath_error": st.last_error,
+        }
+        r = self.http.post(
+            "/api/v1/agent/heartbeat",
+            headers=self._headers(),
+            json={
+                "applied_version": self.state.applied_version,
+                "backend": self.backend.name,
+                "stats": stats,
+            },
+        )
         r.raise_for_status()
 
     # ---------------------------------------------------------------- main loop
@@ -213,8 +259,13 @@ class NodeAgent:
         self.restore_last_known_good()
         next_bundle = next_hb = 0.0
         backoff = 1.0
-        log.info("agent running", node_id=self.state.node_id, source=self.cfg.source,
-                 backend=self.backend.name, applied_version=self.state.applied_version)
+        log.info(
+            "agent running",
+            node_id=self.state.node_id,
+            source=self.cfg.source,
+            backend=self.backend.name,
+            applied_version=self.state.applied_version,
+        )
         while not self._stop.is_set():
             now = time.monotonic()
             try:
@@ -231,15 +282,16 @@ class NodeAgent:
             except (httpx.HTTPError, RecoverableError) as exc:
                 # Control plane unreachable: enforcement continues on last-known-good.
                 self.stats["last_sync_error"] = str(exc)[:200]
-                log.warning("control plane sync failed; retrying", error=str(exc)[:200],
-                            retry_in=backoff)
+                log.warning(
+                    "control plane sync failed; retrying", error=str(exc)[:200], retry_in=backoff
+                )
                 self._stop.wait(backoff)
                 backoff = min(backoff * 2, 60.0)
         log.info("agent stopped")
 
 
 def load_config(path: Path) -> AgentConfig:
-    import yaml  # noqa: PLC0415
+    import yaml
 
     data = yaml.safe_load(path.read_text()) or {}
     env_url = os.environ.get("NEURAWALL_AGENT_URL")
@@ -249,5 +301,7 @@ def load_config(path: Path) -> AgentConfig:
 
 
 def dump_config_example() -> str:
-    return json.dumps(AgentConfig(control_plane_url="https://neurawall.example.com").model_dump(
-        mode="json"), indent=2)
+    return json.dumps(
+        AgentConfig(control_plane_url="https://neurawall.example.com").model_dump(mode="json"),
+        indent=2,
+    )

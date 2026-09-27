@@ -85,8 +85,9 @@ def _clamp(x: float) -> float:
     return min(max(float(x), 0.0), 1.0)
 
 
-def to_rule_draft(out: schemas.LlmRuleDraft, *, source: DraftSource,
-                  evidence_flow_ids: list[str]) -> RuleDraft:
+def to_rule_draft(
+    out: schemas.LlmRuleDraft, *, source: DraftSource, evidence_flow_ids: list[str]
+) -> RuleDraft:
     try:
         action = Action(out.action)
         labels = [ThreatLabel(x) for x in out.match.labels if x in ThreatLabel.__members__.values()]
@@ -102,7 +103,8 @@ def to_rule_draft(out: schemas.LlmRuleDraft, *, source: DraftSource,
             labels=labels,
             min_label_confidence=_clamp(out.match.min_label_confidence),
             min_anomaly_score=_clamp(out.match.min_anomaly_score)
-            if out.match.min_anomaly_score is not None else None,
+            if out.match.min_anomaly_score is not None
+            else None,
         )
         return RuleDraft(
             name=out.name.strip()[:120] or "Unnamed draft",
@@ -123,8 +125,10 @@ def to_rule_draft(out: schemas.LlmRuleDraft, *, source: DraftSource,
 def to_alert_summary(out: schemas.LlmAlertSummary, *, source: DraftSource) -> AlertSummary:
     try:
         return AlertSummary(
-            title=out.title[:200], summary=out.summary[:2000],
-            severity=Severity(out.severity) if out.severity in Severity.__members__.values()
+            title=out.title[:200],
+            summary=out.summary[:2000],
+            severity=Severity(out.severity)
+            if out.severity in Severity.__members__.values()
             else Severity.MEDIUM,
             recommended_actions=[a[:300] for a in out.recommended_actions[:6]],
             source=source,
@@ -135,7 +139,11 @@ def to_alert_summary(out: schemas.LlmAlertSummary, *, source: DraftSource) -> Al
 
 def to_narrative(out: schemas.LlmIncidentNarrative, *, source: DraftSource) -> IncidentNarrative:
     try:
-        return IncidentNarrative(title=out.title[:200], narrative=out.narrative[:6000],
-                                 timeline=[t[:400] for t in out.timeline[:40]], source=source)
+        return IncidentNarrative(
+            title=out.title[:200],
+            narrative=out.narrative[:6000],
+            timeline=[t[:400] for t in out.timeline[:40]],
+            source=source,
+        )
     except ValueError as exc:
         raise ValidationFailure(f"model narrative rejected: {exc}") from exc

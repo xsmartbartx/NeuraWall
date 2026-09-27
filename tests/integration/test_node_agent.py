@@ -25,14 +25,22 @@ class ListSource:
 
 @pytest.fixture
 def env(tmp_path):
-    settings = load_settings(environment="test", data_dir=tmp_path / "cp", log_json=False,
-                             inference={"baseline_warmup_flows": 50, "isolation_forest_trees": 20},
-                             auth={"bootstrap_admin_password": "Admin-Password-1!"})
+    settings = load_settings(
+        environment="test",
+        data_dir=tmp_path / "cp",
+        log_json=False,
+        inference={"baseline_warmup_flows": 50, "isolation_forest_trees": 20},
+        auth={"bootstrap_admin_password": "Admin-Password-1!"},
+    )
     cp = ControlPlane(settings, signer=EphemeralSigner(), advisor_backend=None)
     app = create_app(settings, control_plane=cp, start_background=False)
     with TestClient(app) as http:
-        cfg = AgentConfig(control_plane_url="http://testserver", state_dir=tmp_path / "agent",
-                          name="edge-1", batch_size=1000)
+        cfg = AgentConfig(
+            control_plane_url="http://testserver",
+            state_dir=tmp_path / "agent",
+            name="edge-1",
+            batch_size=1000,
+        )
         yield cp, http, cfg
 
 
@@ -78,8 +86,9 @@ def test_rejects_forged_and_rolled_back_bundles(env):
     assert not agent.apply_envelope(forged)
     # Replay of an older, validly signed bundle (anti-rollback).
     with cp.db.session() as s:
-        from neurawall.services.control_plane import db
         from neurawall.core.models import SignedEnvelope
+        from neurawall.services.control_plane import db
+
         v1 = SignedEnvelope.model_validate(s.get(db.BundleRow, 1).envelope)
     assert not agent.apply_envelope(v1)
     assert agent.state.applied_version == 2 and agent.stats["bundle_rejections"] == 2
@@ -91,8 +100,9 @@ def test_last_known_good_survives_restart_without_control_plane(env, tmp_path):
     a1.enroll(cp.create_enrollment_token("admin"))
     a1.sync_bundle()
     # New process, fresh datapath, control plane unreachable.
-    a2 = NodeAgent(cfg.model_copy(update={"control_plane_url": "http://127.0.0.1:9"}),
-                   backend=DryRunBackend())
+    a2 = NodeAgent(
+        cfg.model_copy(update={"control_plane_url": "http://127.0.0.1:9"}), backend=DryRunBackend()
+    )
     a2.restore_last_known_good()
     assert a2.backend.state().applied_version == 1
 

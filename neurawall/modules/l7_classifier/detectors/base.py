@@ -15,8 +15,14 @@ class Finding:
 
     def attributions(self) -> list[Attribution]:
         top = sorted(self.evidence, key=lambda e: abs(e[1]), reverse=True)[:8]
-        return [Attribution(feature=f[:64], contribution=round(w, 4),
-                            value=(v[:120] if isinstance(v, str) else v)) for f, w, v in top]
+        return [
+            Attribution(
+                feature=f[:64],
+                contribution=round(w, 4),
+                value=(v[:120] if isinstance(v, str) else v),
+            )
+            for f, w, v in top
+        ]
 
 
 def logistic(z: float) -> float:

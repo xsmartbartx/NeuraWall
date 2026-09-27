@@ -34,8 +34,10 @@ def get_cp(request: Request) -> ControlPlane:
     return request.app.state.cp  # type: ignore[no-any-return]
 
 
-def current_user(creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
-                 cp: ControlPlane = Depends(get_cp)) -> Principal:
+def current_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    cp: ControlPlane = Depends(get_cp),
+) -> Principal:
     if creds is None or creds.credentials.startswith(API_KEY_PREFIX):
         raise Unauthenticated("authentication required")
     try:
@@ -52,11 +54,14 @@ def require(permission: Permission) -> Callable[[Principal], Principal]:
             raise PolicyViolation("password change required before continuing")
         authorize(user.role, permission)
         return user
+
     return dep
 
 
-def current_node(creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
-                 cp: ControlPlane = Depends(get_cp)) -> db.Node:
+def current_node(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    cp: ControlPlane = Depends(get_cp),
+) -> db.Node:
     if creds is None or not creds.credentials.startswith(API_KEY_PREFIX):
         raise Unauthenticated("node API key required")
     try:

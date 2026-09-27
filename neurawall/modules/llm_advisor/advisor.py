@@ -58,14 +58,19 @@ class LlmAdvisor:
         out, source = self._run(
             "Draft one firewall rule that addresses the threat shown by these flows.",
             {"flows": [flow_context(e) for e in evidence], "existing_rules": rules_context(rules)},
-            schemas.LlmRuleDraft, lambda: heuristic.draft_rule(evidence, rules))
+            schemas.LlmRuleDraft,
+            lambda: heuristic.draft_rule(evidence, rules),
+        )
         try:
             return guardrails.to_rule_draft(out, source=source, evidence_flow_ids=ids)
         except ValidationFailure as exc:
             log.warning("tier3 draft rejected by guardrails; using heuristic", error=str(exc))
             _calls.inc(source=source.value, outcome="rejected")
-            return guardrails.to_rule_draft(heuristic.draft_rule(evidence, rules),
-                                            source=DraftSource.HEURISTIC, evidence_flow_ids=ids)
+            return guardrails.to_rule_draft(
+                heuristic.draft_rule(evidence, rules),
+                source=DraftSource.HEURISTIC,
+                evidence_flow_ids=ids,
+            )
 
     def summarize_alert(self, evidence: list[Evidence]) -> AlertSummary:
         evidence = evidence[:MAX_EVIDENCE]
@@ -73,7 +78,9 @@ class LlmAdvisor:
             "Triage this alert: give a concise title, a one-paragraph summary for an analyst, "
             "a severity, and up to four recommended actions.",
             {"flows": [flow_context(e) for e in evidence]},
-            schemas.LlmAlertSummary, lambda: heuristic.summarize(evidence))
+            schemas.LlmAlertSummary,
+            lambda: heuristic.summarize(evidence),
+        )
         return guardrails.to_alert_summary(out, source=source)
 
     def narrate_incident(self, evidence: list[Evidence]) -> IncidentNarrative:
@@ -82,11 +89,14 @@ class LlmAdvisor:
             "Reconstruct the incident: a title, a prose narrative of what likely happened and "
             "in what order, and a timeline of the key events (one line each, UTC timestamps).",
             {"flows": [flow_context(e) for e in evidence]},
-            schemas.LlmIncidentNarrative, lambda: heuristic.narrate(evidence))
+            schemas.LlmIncidentNarrative,
+            lambda: heuristic.narrate(evidence),
+        )
         return guardrails.to_narrative(out, source=source)
 
-    def explain_verdict(self, verdict: Verdict, rule: Rule | None,
-                        evidence: Evidence | None) -> tuple[str, DraftSource]:
+    def explain_verdict(
+        self, verdict: Verdict, rule: Rule | None, evidence: Evidence | None
+    ) -> tuple[str, DraftSource]:
         payload: dict[str, object] = {"verdict": verdict_context(verdict)}
         if rule:
             payload["rule"] = rules_context([rule])[0] | {"rationale": rule.rationale}
@@ -95,13 +105,17 @@ class LlmAdvisor:
         out, source = self._run(
             "Explain in plain language, for a non-specialist, why this flow received this "
             "verdict. Three to five sentences.",
-            payload, schemas.LlmExplanation, lambda: heuristic.explain(verdict, rule, evidence))
+            payload,
+            schemas.LlmExplanation,
+            lambda: heuristic.explain(verdict, rule, evidence),
+        )
         return out.explanation[:3000], source
 
     # -- internals ---------------------------------------------------------------
 
-    def _run(self, task: str, payload: dict[str, object], output: type[T],
-             fallback: object) -> tuple[T, DraftSource]:
+    def _run(
+        self, task: str, payload: dict[str, object], output: type[T], fallback: object
+    ) -> tuple[T, DraftSource]:
         if self.backend is not None and self.budget.try_spend():
             markers = guardrails.injection_markers(payload)
             context = guardrails.wrap_untrusted(payload | {"injection_markers": markers})

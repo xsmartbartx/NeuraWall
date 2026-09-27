@@ -28,7 +28,9 @@ def engine(*rules, **kw):
 
 
 def test_first_matching_rule_by_priority_wins():
-    allow = make_rule(1, action=Action.ALLOW, priority=10, match=RuleMatch(src_cidrs=["10.0.0.0/24"]))
+    allow = make_rule(
+        1, action=Action.ALLOW, priority=10, match=RuleMatch(src_cidrs=["10.0.0.0/24"])
+    )
     drop = make_rule(2, action=Action.DROP, priority=20, match=RuleMatch(dst_ports=[443]))
     v = engine(drop, allow).evaluate(Evidence(flow=make_flow()))
     assert v.action == Action.ALLOW and v.rule_id == "R-000001" and not v.enforced
@@ -47,8 +49,11 @@ def test_alert_only_rule_never_enforces():
 
 def test_models_alone_cannot_block():
     f = make_flow()
-    ev = Evidence(flow=f, anomaly=AnomalyScore(flow_id=f.flow_id, score=0.99, confidence=1.0),
-                  classifications=(classification(f.flow_id, ThreatLabel.C2_BEACON, 0.99),))
+    ev = Evidence(
+        flow=f,
+        anomaly=AnomalyScore(flow_id=f.flow_id, score=0.99, confidence=1.0),
+        classifications=(classification(f.flow_id, ThreatLabel.C2_BEACON, 0.99),),
+    )
     v = engine(make_rule(1, match=RuleMatch(dst_ports=[22]))).evaluate(ev)
     assert v.action == Action.ALERT and not v.enforced and v.rule_id is None
 
@@ -56,20 +61,36 @@ def test_models_alone_cannot_block():
 def test_label_rule_blocks_on_confident_classification():
     r = make_rule(5, match=RuleMatch(labels=[ThreatLabel.SQL_INJECTION], min_label_confidence=0.8))
     f = make_flow()
-    weak = Evidence(flow=f, classifications=(classification(f.flow_id, ThreatLabel.SQL_INJECTION, 0.5),))
-    strong = Evidence(flow=f, classifications=(classification(f.flow_id, ThreatLabel.SQL_INJECTION, 0.9),))
+    weak = Evidence(
+        flow=f, classifications=(classification(f.flow_id, ThreatLabel.SQL_INJECTION, 0.5),)
+    )
+    strong = Evidence(
+        flow=f, classifications=(classification(f.flow_id, ThreatLabel.SQL_INJECTION, 0.9),)
+    )
     assert engine(r).evaluate(weak).action == Action.ALLOW
     assert engine(r).evaluate(strong).action == Action.DROP
 
 
 def test_l7_matchers():
     f = make_flow(tls={"sni": "cdn.evil.example"}, http={"path": "/admin/login"})
-    assert engine(make_rule(1, match=RuleMatch(sni_suffixes=["evil.example"]))).evaluate(
-        Evidence(flow=f)).action == Action.DROP
-    assert engine(make_rule(1, match=RuleMatch(http_path_prefixes=["/admin"]))).evaluate(
-        Evidence(flow=f)).action == Action.DROP
-    assert engine(make_rule(1, match=RuleMatch(dns_suffixes=["evil.example"]))).evaluate(
-        Evidence(flow=f)).action == Action.ALLOW
+    assert (
+        engine(make_rule(1, match=RuleMatch(sni_suffixes=["evil.example"])))
+        .evaluate(Evidence(flow=f))
+        .action
+        == Action.DROP
+    )
+    assert (
+        engine(make_rule(1, match=RuleMatch(http_path_prefixes=["/admin"])))
+        .evaluate(Evidence(flow=f))
+        .action
+        == Action.DROP
+    )
+    assert (
+        engine(make_rule(1, match=RuleMatch(dns_suffixes=["evil.example"])))
+        .evaluate(Evidence(flow=f))
+        .action
+        == Action.ALLOW
+    )
 
 
 def test_simulation_blast_radius():
@@ -82,8 +103,12 @@ def test_simulation_blast_radius():
 
 def test_hygiene_detects_shadow_redundant_broad():
     broad = make_rule(1, priority=10, match=RuleMatch(dst_ports=[22, 23]))
-    shadowed = make_rule(2, priority=20, action=Action.ALLOW,
-                         match=RuleMatch(dst_ports=[22], src_cidrs=["10.0.0.0/8"]))
+    shadowed = make_rule(
+        2,
+        priority=20,
+        action=Action.ALLOW,
+        match=RuleMatch(dst_ports=[22], src_cidrs=["10.0.0.0/8"]),
+    )
     redundant = make_rule(3, priority=30, match=RuleMatch(dst_ports=[23]))
     everything = make_rule(4, priority=40, match=RuleMatch(protocols=["tcp"]))
     kinds = {(f.rule_id, f.kind) for f in analyze_hygiene([broad, shadowed, redundant, everything])}

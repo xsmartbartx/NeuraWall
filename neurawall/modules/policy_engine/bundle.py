@@ -16,8 +16,9 @@ def sign_bundle(bundle: PolicyBundle, signer: Signer) -> SignedEnvelope:
     return sign_payload(bundle.model_dump(mode="json"), signer)
 
 
-def open_bundle(envelope: SignedEnvelope, trusted_keys: dict[str, Ed25519PublicKey],
-                *, min_version: int = 0) -> PolicyBundle:
+def open_bundle(
+    envelope: SignedEnvelope, trusted_keys: dict[str, Ed25519PublicKey], *, min_version: int = 0
+) -> PolicyBundle:
     """Verify signature, then schema, then monotonic version (anti-rollback)."""
     payload = verify_envelope(envelope, trusted_keys)
     try:
@@ -26,7 +27,8 @@ def open_bundle(envelope: SignedEnvelope, trusted_keys: dict[str, Ed25519PublicK
         raise IntegrityFailure("signed bundle does not satisfy the bundle schema") from exc
     if bundle.version < min_version:
         raise IntegrityFailure(
-            f"bundle version {bundle.version} is older than applied version {min_version}")
+            f"bundle version {bundle.version} is older than applied version {min_version}"
+        )
     return bundle
 
 
@@ -58,10 +60,13 @@ class RolloutState:
         return node_bucket(node_id, f"v{self.version}") < self.percent
 
     def advance(self) -> RolloutState:
-        return RolloutState(self.version, min(self.stage_index + 1, len(self.stages) - 1), self.stages)
+        return RolloutState(
+            self.version, min(self.stage_index + 1, len(self.stages) - 1), self.stages
+        )
 
 
-def should_rollback(*, baseline_block_rate: float, canary_block_rate: float,
-                    max_increase: float = 0.02) -> bool:
+def should_rollback(
+    *, baseline_block_rate: float, canary_block_rate: float, max_increase: float = 0.02
+) -> bool:
     """Auto-rollback when the canary blocks materially more traffic than the baseline."""
     return canary_block_rate - baseline_block_rate > max_increase

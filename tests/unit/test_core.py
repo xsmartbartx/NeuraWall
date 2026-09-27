@@ -52,7 +52,13 @@ def test_rule_match_requires_criterion():
 
 def test_rule_requires_rationale():
     with pytest.raises(ValidationError):
-        Rule(id="R-000001", name="x", rationale="", action=Action.DROP, match=RuleMatch(dst_ports=[1]))
+        Rule(
+            id="R-000001",
+            name="x",
+            rationale="",
+            action=Action.DROP,
+            match=RuleMatch(dst_ports=[1]),
+        )
     with pytest.raises(ValidationError):
         Rule(id="bad", name="x", rationale="r", action=Action.DROP, match=RuleMatch(dst_ports=[1]))
 
@@ -80,14 +86,18 @@ def test_matching_helpers():
 
 def test_redaction():
     assert redact({"Authorization": "Bearer abc", "user": "bob"}) == {
-        "Authorization": "[REDACTED]", "user": "bob"}
+        "Authorization": "[REDACTED]",
+        "user": "bob",
+    }
     assert "abc123" not in redact_text("GET /login?token=abc123 HTTP/1.1")
     assert "sk-ant-" not in redact_text("key sk-ant-api03-abcdefghijklmnop")
     assert redact({"nested": {"password": "x"}})["nested"]["password"] == "[REDACTED]"
 
 
 def test_logger_redacts_fields(capsys):
-    record = logging.LogRecord("t", logging.INFO, __file__, 1, "call https://x.io/a?k=v", None, None)
+    record = logging.LogRecord(
+        "t", logging.INFO, __file__, 1, "call https://x.io/a?k=v", None, None
+    )
     record.fields = {"api_key": "secret", "path": "/p?q=1"}
     RedactionFilter().filter(record)
     doc = json.loads(JsonFormatter().format(record))

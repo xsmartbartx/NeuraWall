@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import Any, TypeVar, cast
 
 import anthropic
 from pydantic import BaseModel
@@ -48,8 +48,16 @@ what legitimate traffic might be affected.
 
 
 class ClaudeBackend:
-    def __init__(self, *, api_key: str | None, model: str, max_tokens: int, effort: str,
-                 timeout_seconds: float, server_side_fallbacks: bool) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str | None,
+        model: str,
+        max_tokens: int,
+        effort: str,
+        timeout_seconds: float,
+        server_side_fallbacks: bool,
+    ) -> None:
         self.model = model
         self.max_tokens = max_tokens
         self.effort = effort
@@ -66,9 +74,10 @@ class ClaudeBackend:
                 model=self.model,
                 max_tokens=self.max_tokens,
                 thinking={"type": "adaptive"},
-                output_config={"effort": self.effort},
-                system=[{"type": "text", "text": SYSTEM_PROMPT,
-                         "cache_control": {"type": "ephemeral"}}],
+                output_config=cast(Any, {"effort": self.effort}),
+                system=[
+                    {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
+                ],
                 messages=[{"role": "user", "content": f"{context}\n\nTask: {task}"}],
                 output_format=output,
                 **kwargs,  # type: ignore[arg-type]
@@ -87,6 +96,11 @@ class ClaudeBackend:
         parsed = response.parsed_output
         if parsed is None:
             raise RecoverableError("Claude returned no structured output")
-        log.info("tier3 call", model=response.model, request_id=getattr(response, "_request_id", None),
-                 input_tokens=response.usage.input_tokens, output_tokens=response.usage.output_tokens)
+        log.info(
+            "tier3 call",
+            model=response.model,
+            request_id=getattr(response, "_request_id", None),
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+        )
         return parsed

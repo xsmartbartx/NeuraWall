@@ -188,8 +188,9 @@ Index("ix_heartbeats_node_ts", NodeHeartbeat.node_id, NodeHeartbeat.ts)
 
 def make_engine(url: str) -> Engine:
     if url.startswith("sqlite"):
-        engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 30},
-                               pool_pre_ping=True)
+        engine = create_engine(
+            url, connect_args={"check_same_thread": False, "timeout": 30}, pool_pre_ping=True
+        )
 
         @event.listens_for(engine, "connect")
         def _pragmas(dbapi_conn: Any, _: Any) -> None:
@@ -198,6 +199,7 @@ def make_engine(url: str) -> Engine:
             cur.execute("PRAGMA synchronous=NORMAL")
             cur.execute("PRAGMA foreign_keys=ON")
             cur.close()
+
         return engine
     return create_engine(url, pool_pre_ping=True, pool_size=10, max_overflow=20)
 

@@ -95,14 +95,22 @@ class ZeekSource:
     short hold (``join_delay``) is enough to join them.
     """
 
-    def __init__(self, directory: Path, node_id: str = "local", join_delay: float = 5.0,
-                 from_start: bool = False) -> None:
+    def __init__(
+        self,
+        directory: Path,
+        node_id: str = "local",
+        join_delay: float = 5.0,
+        from_start: bool = False,
+    ) -> None:
         self.node_id = node_id
         self.join_delay = join_delay
-        self.tailers = {n: FileTailer(directory / f"{n}.log", from_start=from_start)
-                        for n in ("conn", "dns", "ssl", "http")}
+        self.tailers = {
+            n: FileTailer(directory / f"{n}.log", from_start=from_start)
+            for n in ("conn", "dns", "ssl", "http")
+        }
         self._side: dict[str, OrderedDict[str, dict[str, Any]]] = {
-            n: OrderedDict() for n in ("dns", "ssl", "http")}
+            n: OrderedDict() for n in ("dns", "ssl", "http")
+        }
         self._ua_by_host: OrderedDict[str, str] = OrderedDict()
         self._pending: list[tuple[float, dict[str, Any]]] = []
 
@@ -131,15 +139,21 @@ class ZeekSource:
             if doc:
                 self._pending.append((now, doc))
         ready = [c for t, c in self._pending if now - t >= self.join_delay][:max_items]
-        self._pending = self._pending[len(ready):]
+        self._pending = self._pending[len(ready) :]
         out: list[dict[str, Any]] = []
         for conn in ready:
             uid = conn.get("uid", "")
             try:
-                out.append(zeek_to_flow(conn, self._side["dns"].pop(uid, None),
-                                        self._side["ssl"].pop(uid, None),
-                                        self._side["http"].pop(uid, None),
-                                        node_id=self.node_id, ua_by_host=self._ua_by_host))
+                out.append(
+                    zeek_to_flow(
+                        conn,
+                        self._side["dns"].pop(uid, None),
+                        self._side["ssl"].pop(uid, None),
+                        self._side["http"].pop(uid, None),
+                        node_id=self.node_id,
+                        ua_by_host=self._ua_by_host,
+                    )
+                )
             except (KeyError, TypeError, ValueError, ValidationError):
                 continue
         return out
@@ -148,7 +162,9 @@ class ZeekSource:
 class DemoSource:
     """Synthetic traffic with occasional attacks — for trials and demos."""
 
-    def __init__(self, node_id: str, rate_per_second: float = 20.0, attack_rate: float = 0.01) -> None:
+    def __init__(
+        self, node_id: str, rate_per_second: float = 20.0, attack_rate: float = 0.01
+    ) -> None:
         self.gen = TrafficGenerator(seed=int(time.time()), node_id=node_id)
         self.rate = rate_per_second
         self.attack_rate = attack_rate

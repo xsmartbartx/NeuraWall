@@ -26,8 +26,9 @@ from neurawall.core.models import SignedEnvelope
 
 def canonical_json(payload: Any) -> bytes:
     """Deterministic encoding: sorted keys, no whitespace, UTF-8."""
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-                      default=str).encode()
+    return json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+    ).encode()
 
 
 def sha256_hex(data: bytes) -> str:
@@ -101,7 +102,7 @@ class FileSigner:
 class EphemeralSigner(FileSigner):
     """In-memory key for tests and demos."""
 
-    def __init__(self) -> None:  # noqa: D107 - intentionally skips file handling
+    def __init__(self) -> None:
         self._key = Ed25519PrivateKey.generate()
         self._key_id = key_id_for(self._key.public_key())
 
@@ -113,7 +114,9 @@ def sign_payload(payload: dict[str, Any], signer: Signer) -> SignedEnvelope:
     )
 
 
-def verify_envelope(envelope: SignedEnvelope, trusted_keys: dict[str, Ed25519PublicKey]) -> dict[str, Any]:
+def verify_envelope(
+    envelope: SignedEnvelope, trusted_keys: dict[str, Ed25519PublicKey]
+) -> dict[str, Any]:
     """Verify and return the payload. Raises :class:`IntegrityFailure` on any mismatch."""
     key = trusted_keys.get(envelope.key_id)
     if key is None:

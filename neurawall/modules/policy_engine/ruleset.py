@@ -89,13 +89,26 @@ def match_covers(outer: RuleMatch, inner: RuleMatch) -> bool:
         and _set_covers(list(outer.directions), list(inner.directions))
         and _suffix_covers(outer.sni_suffixes, inner.sni_suffixes)
         and _suffix_covers(outer.dns_suffixes, inner.dns_suffixes)
-        and (not outer.http_path_prefixes or (bool(inner.http_path_prefixes) and all(
-            any(i.startswith(o) for o in outer.http_path_prefixes) for i in inner.http_path_prefixes)))
+        and (
+            not outer.http_path_prefixes
+            or (
+                bool(inner.http_path_prefixes)
+                and all(
+                    any(i.startswith(o) for o in outer.http_path_prefixes)
+                    for i in inner.http_path_prefixes
+                )
+            )
+        )
         and _set_covers(list(outer.ja3), list(inner.ja3))
         and _set_covers(list(outer.labels), list(inner.labels))
         and outer.min_label_confidence <= inner.min_label_confidence
-        and (outer.min_anomaly_score is None or (
-            inner.min_anomaly_score is not None and outer.min_anomaly_score <= inner.min_anomaly_score))
+        and (
+            outer.min_anomaly_score is None
+            or (
+                inner.min_anomaly_score is not None
+                and outer.min_anomaly_score <= inner.min_anomaly_score
+            )
+        )
     )
 
 
@@ -103,8 +116,13 @@ def _is_overly_broad(m: RuleMatch) -> bool:
     wide_src = not m.src_cidrs or any(c.endswith("/0") for c in m.src_cidrs)
     wide_dst = not m.dst_cidrs or any(c.endswith("/0") for c in m.dst_cidrs)
     no_l7 = not (m.sni_suffixes or m.dns_suffixes or m.http_path_prefixes or m.ja3 or m.labels)
-    return wide_src and wide_dst and no_l7 and m.min_anomaly_score is None and \
-        (not m.dst_ports or len(m.dst_ports) > 20)
+    return (
+        wide_src
+        and wide_dst
+        and no_l7
+        and m.min_anomaly_score is None
+        and (not m.dst_ports or len(m.dst_ports) > 20)
+    )
 
 
 def analyze_hygiene(rules: list[Rule]) -> list[HygieneFinding]:
@@ -114,17 +132,29 @@ def analyze_hygiene(rules: list[Rule]) -> list[HygieneFinding]:
         for earlier in ordered[:i]:
             if match_covers(earlier.match, later.match):
                 kind = "redundant" if earlier.action == later.action else "shadowed"
-                findings.append(HygieneFinding(
-                    rule_id=later.id, kind=kind, related_rule_id=earlier.id,
-                    detail=(f"{later.id} can never match: {earlier.id} (priority {earlier.priority})"
+                findings.append(
+                    HygieneFinding(
+                        rule_id=later.id,
+                        kind=kind,
+                        related_rule_id=earlier.id,
+                        detail=(
+                            f"{later.id} can never match: {earlier.id} (priority {earlier.priority})"
                             f" covers all its traffic"
-                            + (" with the same action." if kind == "redundant"
-                               else f" and applies '{earlier.action}' instead of '{later.action}'.")),
-                ))
+                            + (
+                                " with the same action."
+                                if kind == "redundant"
+                                else f" and applies '{earlier.action}' instead of '{later.action}'."
+                            )
+                        ),
+                    )
+                )
                 break
         if later.action.is_blocking and _is_overly_broad(later.match):
-            findings.append(HygieneFinding(
-                rule_id=later.id, kind="overly_broad",
-                detail=f"{later.id} blocks with no source, destination or L7 restriction.",
-            ))
+            findings.append(
+                HygieneFinding(
+                    rule_id=later.id,
+                    kind="overly_broad",
+                    detail=f"{later.id} blocks with no source, destination or L7 restriction.",
+                )
+            )
     return findings

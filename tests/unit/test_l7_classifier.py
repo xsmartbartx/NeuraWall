@@ -7,8 +7,11 @@ from tests.conftest import make_flow
 
 EXPECTED = {
     "sql_injection": {ThreatLabel.SQL_INJECTION},
-    "command_injection": {ThreatLabel.COMMAND_INJECTION, ThreatLabel.PATH_TRAVERSAL,
-                          ThreatLabel.TEMPLATE_INJECTION},
+    "command_injection": {
+        ThreatLabel.COMMAND_INJECTION,
+        ThreatLabel.PATH_TRAVERSAL,
+        ThreatLabel.TEMPLATE_INJECTION,
+    },
     "dga": {ThreatLabel.DGA},
     "dns_tunnel": {ThreatLabel.DNS_TUNNEL},
     "c2_beacon": {ThreatLabel.C2_BEACON},
@@ -38,11 +41,14 @@ def test_benign_false_positive_rate():
     assert len(fps) / len(flows) < 0.001, [f.l7 for f in fps[:3]]
 
 
-@pytest.mark.parametrize("path", [
-    "/p?id=1%2527%2520OR%25201%253D1--",          # double URL-encoded
-    "/p?id=1/**/UNION/**/SELECT/**/pass/**/FROM/**/users",  # comment obfuscation
-    "/p?id=1 UnIoN aLl SeLeCt null,null--",           # case mixing
-])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/p?id=1%2527%2520OR%25201%253D1--",  # double URL-encoded
+        "/p?id=1/**/UNION/**/SELECT/**/pass/**/FROM/**/users",  # comment obfuscation
+        "/p?id=1 UnIoN aLl SeLeCt null,null--",  # case mixing
+    ],
+)
 def test_injection_evasion_variants(path):
     f = make_flow(http={"path": path, "user_agent": "Mozilla/5.0"})
     assert ThreatLabel.SQL_INJECTION in {c.label for c in L7Classifier().classify(f)}

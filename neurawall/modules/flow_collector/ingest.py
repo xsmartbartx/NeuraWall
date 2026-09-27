@@ -82,7 +82,12 @@ def read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
 # Zeek
 # ---------------------------------------------------------------------------
 
-_BROWSERS = (("edg/", "edge"), ("firefox/", "firefox"), ("chrome/", "chrome"), ("safari/", "safari"))
+_BROWSERS = (
+    ("edg/", "edge"),
+    ("firefox/", "firefox"),
+    ("chrome/", "chrome"),
+    ("safari/", "safari"),
+)
 
 
 def claimed_client(user_agent: str | None) -> str | None:
@@ -106,9 +111,15 @@ def _direction(conn: dict[str, Any]) -> Direction:
     return Direction.OUTBOUND
 
 
-def zeek_to_flow(conn: dict[str, Any], dns: dict[str, Any] | None, ssl: dict[str, Any] | None,
-                 http: dict[str, Any] | None, *, node_id: str,
-                 ua_by_host: dict[str, str] | None = None) -> dict[str, Any]:
+def zeek_to_flow(
+    conn: dict[str, Any],
+    dns: dict[str, Any] | None,
+    ssl: dict[str, Any] | None,
+    http: dict[str, Any] | None,
+    *,
+    node_id: str,
+    ua_by_host: dict[str, str] | None = None,
+) -> dict[str, Any]:
     ts = float(conn["ts"])
     proto = str(conn.get("proto", "tcp")).lower()
     doc: dict[str, Any] = {
@@ -116,8 +127,10 @@ def zeek_to_flow(conn: dict[str, Any], dns: dict[str, Any] | None, ssl: dict[str
         "node_id": node_id,
         "ts_start": ts,
         "ts_end": ts + float(conn.get("duration") or 0.0),
-        "src_ip": conn["id.orig_h"], "dst_ip": conn["id.resp_h"],
-        "src_port": int(conn.get("id.orig_p", 0)), "dst_port": int(conn.get("id.resp_p", 0)),
+        "src_ip": conn["id.orig_h"],
+        "dst_ip": conn["id.resp_h"],
+        "src_port": int(conn.get("id.orig_p", 0)),
+        "dst_port": int(conn.get("id.resp_p", 0)),
         "protocol": proto if proto in Protocol.__members__.values() else "tcp",
         "direction": _direction(conn),
         "bytes_out": int(conn.get("orig_ip_bytes") or conn.get("orig_bytes") or 0),
@@ -130,20 +143,30 @@ def zeek_to_flow(conn: dict[str, Any], dns: dict[str, Any] | None, ssl: dict[str
         del doc["flow_id"]
     l7: dict[str, Any] = {}
     if dns and dns.get("query"):
-        l7["dns"] = DnsMeta(qname=dns["query"], qtype=str(dns.get("qtype_name") or "A")[:10],
-                            rcode=str(dns.get("rcode_name") or "NOERROR")[:16],
-                            answers=len(dns.get("answers") or [])).model_dump()
+        l7["dns"] = DnsMeta(
+            qname=dns["query"],
+            qtype=str(dns.get("qtype_name") or "A")[:10],
+            rcode=str(dns.get("rcode_name") or "NOERROR")[:16],
+            answers=len(dns.get("answers") or []),
+        ).model_dump()
     if http:
-        l7["http"] = HttpMeta(method=str(http.get("method") or "GET")[:16], host=http.get("host"),
-                              path=str(http.get("uri") or "/")[:2048],
-                              user_agent=(http.get("user_agent") or None),
-                              status=http.get("status_code"),
-                              body_len=int(http.get("request_body_len") or 0)).model_dump()
+        l7["http"] = HttpMeta(
+            method=str(http.get("method") or "GET")[:16],
+            host=http.get("host"),
+            path=str(http.get("uri") or "/")[:2048],
+            user_agent=(http.get("user_agent") or None),
+            status=http.get("status_code"),
+            body_len=int(http.get("request_body_len") or 0),
+        ).model_dump()
     if ssl:
         ua = (http or {}).get("user_agent") or (ua_by_host or {}).get(conn["id.orig_h"])
-        l7["tls"] = TlsMeta(sni=ssl.get("server_name") or None, version=ssl.get("version"),
-                            ja3=ssl.get("ja3"), ja4=ssl.get("ja4"),
-                            claimed_client=claimed_client(ua)).model_dump()
+        l7["tls"] = TlsMeta(
+            sni=ssl.get("server_name") or None,
+            version=ssl.get("version"),
+            ja3=ssl.get("ja3"),
+            ja4=ssl.get("ja4"),
+            claimed_client=claimed_client(ua),
+        ).model_dump()
     if l7:
         doc["l7"] = L7Meta.model_validate(l7).model_dump()
     return doc
@@ -151,20 +174,31 @@ def zeek_to_flow(conn: dict[str, Any], dns: dict[str, Any] | None, ssl: dict[str
 
 def read_zeek_dir(directory: Path, *, node_id: str) -> IngestResult:
     """Join one rotation of Zeek JSON logs (conn/dns/ssl/http) into flows."""
+
     def index(name: str) -> dict[str, dict[str, Any]]:
         p = directory / f"{name}.log"
         return {r["uid"]: r for r in read_jsonl(p) if "uid" in r} if p.exists() else {}
 
     dns, ssl, http = index("dns"), index("ssl"), index("http")
-    ua_by_host = {r.get("id.orig_h", ""): r["user_agent"] for r in http.values() if r.get("user_agent")}
+    ua_by_host = {
+        r.get("id.orig_h", ""): r["user_agent"] for r in http.values() if r.get("user_agent")
+    }
     docs: list[Any] = []
     conn = directory / "conn.log"
     if conn.exists():
         for c in read_jsonl(conn):
             try:
                 uid = c.get("uid", "")
-                docs.append(zeek_to_flow(c, dns.get(uid), ssl.get(uid), http.get(uid),
-                                         node_id=node_id, ua_by_host=ua_by_host))
+                docs.append(
+                    zeek_to_flow(
+                        c,
+                        dns.get(uid),
+                        ssl.get(uid),
+                        http.get(uid),
+                        node_id=node_id,
+                        ua_by_host=ua_by_host,
+                    )
+                )
             except (KeyError, TypeError, ValueError, ValidationError):
                 docs.append(None)  # counted as rejected
     return parse_flows(docs)

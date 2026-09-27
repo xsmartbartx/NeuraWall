@@ -43,6 +43,11 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+# The console is built into this (gitignored) directory by `npm run build`; ship it
+# in both the sdist and the wheel.
+artifacts = ["neurawall/services/control_plane/static/**"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["neurawall"]
 
@@ -52,10 +57,19 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "N", "SIM", "RUF"]
-ignore = ["S101", "B008", "RUF012"]
+# N818: exception names follow the blueprint's vocabulary (PolicyViolation, IntegrityFailure).
+ignore = ["S101", "B008", "RUF012", "N818"]
+
+[tool.ruff.lint.pycodestyle]
+# The formatter keeps code at 100; long string literals may run to 120.
+max-line-length = 120
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S", "N802"]
+"tests/**" = ["S", "N802", "E501"]
+# Synthetic traffic uses non-cryptographic randomness by design.
+"neurawall/modules/flow_collector/generator.py" = ["S311"]
+"neurawall/modules/anomaly_engine/engine.py" = ["S311"]
+"neurawall/services/control_plane/migrations/**" = ["E501", "I001", "F401"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

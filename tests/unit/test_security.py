@@ -59,8 +59,14 @@ def test_audit_chain_detects_tampering():
     entries = []
     prev = None
     for i in range(5):
-        prev = build_entry(prev=prev, ts=time.time(), actor="alice", action="rule.approve",
-                           target=f"R-00000{i}", detail={"i": i, "token": "secret"})
+        prev = build_entry(
+            prev=prev,
+            ts=time.time(),
+            actor="alice",
+            action="rule.approve",
+            target=f"R-00000{i}",
+            detail={"i": i, "token": "secret"},
+        )
         entries.append(prev)
     assert verify_chain(entries) == 5
     assert entries[0].detail["token"] == "[REDACTED]"

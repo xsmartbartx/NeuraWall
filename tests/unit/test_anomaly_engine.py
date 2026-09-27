@@ -11,7 +11,7 @@ def _trained_engine(gen, n=1500):
     eng = AnomalyEngine(warmup_flows=300, trees=50)
     flows = [gen.benign() for _ in range(n)]
     for i in range(0, n, 100):
-        eng.score_batch(flows[i:i + 100])
+        eng.score_batch(flows[i : i + 100])
     return eng
 
 
@@ -52,7 +52,8 @@ def test_change_window_suppression():
     scores = eng.score_batch(flows)
     assert all(s.score <= 0.25 for s in scores)
     assert scores[0].top_features[0].feature == "change_window_suppression" or any(
-        a.feature == "change_window_suppression" for a in scores[0].top_features)
+        a.feature == "change_window_suppression" for a in scores[0].top_features
+    )
 
 
 def test_entropy():

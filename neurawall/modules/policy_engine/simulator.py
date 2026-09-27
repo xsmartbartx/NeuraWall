@@ -18,8 +18,9 @@ def is_legitimate(ev: Evidence) -> bool:
     return not any(c.confidence >= SUSPICIOUS_LABEL_CONFIDENCE for c in ev.malicious_labels)
 
 
-def simulate(match: RuleMatch, action: Action, history: Iterable[Evidence], *,
-             threshold: float) -> SimulationResult:
+def simulate(
+    match: RuleMatch, action: Action, history: Iterable[Evidence], *, threshold: float
+) -> SimulationResult:
     evaluated = matched = legit_total = legit_matched = 0
     sources: set[str] = set()
     destinations: set[str] = set()

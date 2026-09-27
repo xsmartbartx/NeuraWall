@@ -118,7 +118,9 @@ class Settings(BaseSettings):
         if self.inference.t3_ambiguous_low > self.inference.t3_ambiguous_high:
             raise ValueError("inference.t3_ambiguous_low must be <= t3_ambiguous_high")
         if self.environment == "production" and self.auth.secret_key is None:
-            raise ValueError("auth.secret_key (NEURAWALL_AUTH__SECRET_KEY) is required in production")
+            raise ValueError(
+                "auth.secret_key (NEURAWALL_AUTH__SECRET_KEY) is required in production"
+            )
         return self
 
     @property
