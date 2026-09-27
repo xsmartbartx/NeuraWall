@@ -175,3 +175,17 @@ def test_rollback_restores_rules_as_new_version(cp):
     statuses = {b.version: b.status for b in cp.list_bundles()}
     assert statuses[2] == "rolled_back" and statuses[3] == "active"
     assert cp.bundle_for_node("any-node").payload["version"] == 3
+
+
+def test_triage_skips_enforced_and_dedupes_drafts(cp):
+    gen = TrafficGenerator(seed=10)
+    warm(cp, gen)
+    cp.ingest("n1", gen.scenario("dns_tunnel", 6))
+    cp.ingest("n1", gen.scenario("sql_injection", 10))
+    alerts = cp.list_alerts()[0]
+    for a in alerts:
+        cp.triage_alert(a.id)
+    fully_blocked = [a for a in cp.list_alerts()[0] if a.blocked_count == a.flow_count]
+    assert fully_blocked and all(a.draft_id is None for a in fully_blocked)
+    matches = [str(d.data["match"]) for d in cp.list_drafts("pending")]
+    assert len(matches) == len(set(matches))

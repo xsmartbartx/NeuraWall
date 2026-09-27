@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "neurawall-demo",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["scripts/dev-demo.sh"],
+      "port": 8080
+    }
+  ]
+}

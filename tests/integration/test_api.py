@@ -101,7 +101,9 @@ def test_agent_enroll_ingest_and_block_roundtrip(client):
     assert alerts["total"] >= 1
     aid = alerts["items"][0]["id"]
     triaged = client.post(f"/api/v1/alerts/{aid}/triage", headers=h).json()
-    assert triaged["draft_id"]
+    assert triaged["id"] == aid and triaged["summary"] and not triaged["tier3_pending"]
+    # Fully blocked by an existing rule: no redundant draft is proposed.
+    assert (triaged["draft_id"] is None) == (triaged["blocked_count"] == triaged["flow_count"])
     flows = client.get(f"/api/v1/flows?alert_id={aid}", headers=h).json()
     assert flows["total"] >= 1
     fid = flows["items"][0]["flow_id"]

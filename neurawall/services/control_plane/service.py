@@ -793,12 +793,28 @@ class ControlPlane:
             if SEVERITY_ORDER[summary.severity.value] > SEVERITY_ORDER[a.severity]:
                 a.severity = summary.severity.value
             has_draft = a.draft_id is not None
+            # Traffic an existing rule already enforces needs no new rule.
+            already_enforced = a.flow_count > 0 and a.blocked_count == a.flow_count
             a.tier3_pending = False
-        if draft and not has_draft:
+        if draft and not has_draft and not already_enforced:
             d = self.advisor.draft_rule(evidence, self.list_rules())
-            self.create_draft(d, actor=ADVISOR_ACTOR if d.source == DraftSource.LLM else "heuristic-advisor",
-                              alert_id=alert_id)
+            duplicate = self._pending_draft_with_match(d.match)
+            if duplicate is not None:
+                with self.db.session() as s:
+                    a = s.get(db.Alert, alert_id)
+                    if a is not None:
+                        a.draft_id = duplicate
+            else:
+                self.create_draft(d, actor=ADVISOR_ACTOR if d.source == DraftSource.LLM
+                                  else "heuristic-advisor", alert_id=alert_id)
         return self.get_alert(alert_id)
+
+    def _pending_draft_with_match(self, match: RuleMatch) -> str | None:
+        wanted = match.model_dump(mode="json")
+        for row in self.list_drafts("pending"):
+            if row.data.get("match") == wanted:
+                return row.id
+        return None
 
     def narrate_alert(self, actor: str, alert_id: int) -> dict[str, Any]:
         narrative = self.advisor.narrate_incident(self.alert_evidence(alert_id))
@@ -949,7 +965,7 @@ class ControlPlane:
         self.ingest("demo-sensor", warm)
         while not self._stop.wait(2):
             gen.clock = max(gen.clock, time.time() - 2)
-            batch = [lf.flow for lf in gen.stream(60, attack_rate=0.01)]
+            batch = [lf.flow for lf in gen.stream(60, attack_rate=0.002)]
             try:
                 self.ingest("demo-sensor", batch)
             except Exception:
