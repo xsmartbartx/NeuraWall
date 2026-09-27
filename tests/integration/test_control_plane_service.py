@@ -165,3 +165,13 @@ def test_label_rule_blocks_enforced_c2_after_promotion(cp):
     out = cp.ingest("n1", gen.scenario("c2_beacon", 5))
     assert out.verdicts and all(v.action == Action.QUARANTINE for v in out.verdicts)
     assert ThreatLabel.C2_BEACON in out.verdicts[0].labels
+
+
+def test_rollback_restores_rules_as_new_version(cp):
+    cp.update_rule("admin", "R-000005", enabled=False)  # v2
+    assert not cp.get_rule("R-000005").enabled
+    new = cp.rollback_bundle("admin", 2, "too noisy")
+    assert new == 3 and cp.get_rule("R-000005").enabled
+    statuses = {b.version: b.status for b in cp.list_bundles()}
+    assert statuses[2] == "rolled_back" and statuses[3] == "active"
+    assert cp.bundle_for_node("any-node").payload["version"] == 3

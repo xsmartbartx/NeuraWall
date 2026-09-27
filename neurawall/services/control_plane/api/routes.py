@@ -375,9 +375,8 @@ def advance(version: int, cp: CP, actor: Approver) -> dict[str, Any]:
 
 
 @api.post("/bundles/{version}/rollback", tags=["bundles"])
-def rollback(version: int, body: RollbackIn, cp: CP, actor: Approver) -> dict[str, str]:
-    cp.rollback_bundle(actor.email, version, body.reason)
-    return {"status": "rolled_back"}
+def rollback(version: int, body: RollbackIn, cp: CP, actor: Approver) -> dict[str, Any]:
+    return {"status": "rolled_back", "new_version": cp.rollback_bundle(actor.email, version, body.reason)}
 
 
 # ---------------------------------------------------------------- fleet (operator side)

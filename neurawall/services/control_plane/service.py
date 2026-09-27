@@ -477,14 +477,36 @@ class ControlPlane:
         self.audit(actor, "bundle.rollout_advance", f"bundle:v{version}", {"percent": st.percent})
         return row
 
-    def rollback_bundle(self, actor: str, version: int, reason: str) -> None:
+    def rollback_bundle(self, actor: str, version: int, reason: str) -> int:
+        """Restore the rule set of the newest earlier good bundle and publish it as a *new*
+        version, so nodes' anti-rollback (monotonic versions) accepts it."""
         with self.db.session() as s:
             row = s.get(db.BundleRow, version)
             if row is None:
                 raise NotFound("bundle not found")
+            if row.status == "rolled_back":
+                raise PolicyViolation("bundle is already rolled back")
+            prev = s.scalars(select(db.BundleRow).where(
+                db.BundleRow.version < version, db.BundleRow.status != "rolled_back")
+                .order_by(db.BundleRow.version.desc()).limit(1)).first()
+            if prev is None:
+                raise PolicyViolation("no earlier bundle to roll back to")
             row.status = "rolled_back"
-            self._engines.pop(version, None)
-        self.audit(actor, "bundle.rollback", f"bundle:v{version}", {"reason": reason})
+            restored = [Rule.model_validate(r) for r in prev.envelope["payload"]["rules"]]
+            keep = {r.id for r in restored}
+            for rr in s.scalars(select(db.RuleRow)):
+                rr.deleted = rr.id not in keep
+            for rule in restored:
+                existing = s.get(db.RuleRow, rule.id)
+                if existing is None:
+                    s.add(db.RuleRow(id=rule.id, data=rule.model_dump(mode="json")))
+                else:
+                    existing.data, existing.deleted = rule.model_dump(mode="json"), False
+            prev_version = prev.version
+        self.audit(actor, "bundle.rollback", f"bundle:v{version}",
+                   {"reason": reason, "restored_from": prev_version})
+        return self.publish_bundle(actor, note=f"rollback of v{version} to rules of v{prev_version}",
+                                   immediate=True)
 
     def public_key(self) -> tuple[str, str]:
         return self.signer.key_id, self.signer.public_key_pem()
