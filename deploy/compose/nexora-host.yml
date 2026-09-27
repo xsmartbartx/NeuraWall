@@ -4,7 +4,7 @@
 #   /opt/nexora/infrastructure/deployment/deploy.sh neurawall control-plane
 #
 # No ports are published: the edge Caddy (edge-caddy-1) joins the `neurawall_default`
-# network and proxies nerawall.onenexora.com -> neurawall-control-plane-1:8080.
+# network and proxies neurawall.onenexora.com -> neurawall-control-plane-1:8080.
 # Secrets live in /opt/neurawall/.env (mode 0600), see .env.example next to this file.
 name: neurawall
 
