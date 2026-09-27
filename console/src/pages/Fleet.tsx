@@ -13,7 +13,7 @@ export function Fleet() {
 
   const origin = token?.control_plane_url ?? window.location.origin;
   const install = token && [
-    `pip install neurawall   # or use the ghcr.io/neurawall/neurawall image`,
+    `# install the NeuraWall release wheel (or run the container image), then:`,
     `sudo neurawall agent enroll --url ${origin} --state-dir /var/lib/neurawall-agent --token ${token.token}`,
     `sudo neurawall agent run --config /etc/neurawall/agent.yaml`,
   ].join("\n");

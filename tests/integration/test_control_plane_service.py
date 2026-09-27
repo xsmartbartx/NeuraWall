@@ -249,3 +249,18 @@ def test_bootstrap_password_file_removed_after_first_change(tmp_path):
     plane.change_password(user.id, password, "New-Admin-Pass-42")
     assert not f.exists()
     plane.stop()
+
+
+def test_signing_key_rotation_republishes_bundle(tmp_path):
+    settings = load_settings(
+        environment="test",
+        data_dir=tmp_path,
+        auth={"bootstrap_admin_password": "Admin-Password-1!"},
+    )
+    first = ControlPlane(settings, signer=EphemeralSigner(), advisor_backend=None)
+    first.stop()
+    rotated = EphemeralSigner()
+    second = ControlPlane(settings, signer=rotated, advisor_backend=None)
+    env = second.bundle_for_node("node-x")
+    assert env.key_id == rotated.key_id and env.payload["version"] == 2
+    second.stop()

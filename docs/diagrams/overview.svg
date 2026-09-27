@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" font-family="IBM Plex Sans, Segoe UI, sans-serif" font-size="13">
+  <style>
+    .box{fill:#111821;stroke:#2b3a49;stroke-width:1.5;rx:8}
+    .t{fill:#dbe4ec;font-weight:600}
+    .s{fill:#8597a8;font-size:11.5px}
+    .a{stroke:#5b6c7c;stroke-width:1.6;fill:none;marker-end:url(#m)}
+    .g{stroke:#3ddc97}
+    .v{stroke:#a78bfa;stroke-dasharray:5 4}
+    .zone{fill:none;stroke:#1e2a36;stroke-dasharray:4 4}
+    .z{fill:#5b6c7c;font-size:11px;letter-spacing:.08em}
+  </style>
+  <defs><marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#5b6c7c"/></marker></defs>
+  <rect width="960" height="440" fill="#0b1016"/>
+
+  <rect class="zone" x="16" y="16" width="300" height="408" rx="10"/>
+  <text class="z" x="30" y="38">ENFORCEMENT NODE</text>
+  <rect class="box" x="36" y="56" width="260" height="56"/><text class="t" x="50" y="80">Flow sensor (Zeek)</text><text class="s" x="50" y="98">conn · dns · ssl · http metadata</text>
+  <rect class="box" x="36" y="152" width="260" height="66"/><text class="t" x="50" y="176">Node agent</text><text class="s" x="50" y="194">verifies Ed25519 bundles (pinned key)</text><text class="s" x="50" y="209">anti-rollback · last-known-good</text>
+  <rect class="box" x="36" y="262" width="260" height="66"/><text class="t" x="50" y="286">Datapath</text><text class="s" x="50" y="304">nftables static rules + timed</text><text class="s" x="50" y="319">verdict sets · or dry-run</text>
+  <path class="a" d="M166 112V150"/><path class="a g" d="M166 218V260"/>
+
+  <rect class="zone" x="336" y="16" width="608" height="408" rx="10"/>
+  <text class="z" x="350" y="38">CONTROL PLANE</text>
+  <rect class="box" x="356" y="56" width="176" height="62"/><text class="t" x="370" y="80">Tier 1 · anomaly</text><text class="s" x="370" y="98">isolation forest · EWMA</text>
+  <rect class="box" x="356" y="140" width="176" height="62"/><text class="t" x="370" y="164">Tier 2 · L7 classifier</text><text class="s" x="370" y="182">injection · DGA · C2 · exfil</text>
+  <rect class="box" x="356" y="224" width="176" height="62"/><text class="t" x="370" y="248" fill="#a78bfa">Tier 3 · Claude advisor</text><text class="s" x="370" y="266">triage · drafts · narration</text>
+  <rect class="box" x="572" y="96" width="176" height="80" style="stroke:#3ddc97"/><text class="t" x="586" y="122">Policy engine</text><text class="s" x="586" y="140">sole enforcement authority</text><text class="s" x="586" y="156">every drop → one rule id</text>
+  <rect class="box" x="572" y="224" width="176" height="62"/><text class="t" x="586" y="248">Simulator</text><text class="s" x="586" y="266">blast radius on legit traffic</text>
+  <rect class="box" x="772" y="224" width="156" height="62" style="stroke:#f5b544"/><text class="t" x="786" y="248">Human approval</text><text class="s" x="786" y="266">RBAC · four-eyes</text>
+  <rect class="box" x="772" y="96" width="156" height="80"/><text class="t" x="786" y="122">Signed bundles</text><text class="s" x="786" y="140">canary 5→25→100%</text><text class="s" x="786" y="156">auto-rollback</text>
+  <rect class="box" x="356" y="330" width="572" height="62"/><text class="t" x="370" y="354">Operator console · REST API · hash-chained audit trail · PostgreSQL</text><text class="s" x="370" y="372">alerts · flow explorer · approvals · rules · fleet · users</text>
+
+  <path class="a" d="M444 118V138"/><path class="a v" d="M444 202V222"/>
+  <path class="a" d="M532 87H570"/><path class="a" d="M532 171H570"/>
+  <path class="a v" d="M532 255H570"/><path class="a v" d="M748 255H770"/>
+  <path class="a g" d="M850 222V178"/><path class="a g" d="M748 136H770"/>
+  <path class="a" d="M296 84H340 V87 H354"/>
+  <path class="a g" d="M772 160 C 520 440, 320 240, 298 190"/>
+</svg>

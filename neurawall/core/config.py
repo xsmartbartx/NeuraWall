@@ -29,24 +29,32 @@ class InferenceSettings(_Section):
     t2_escalation_threshold: float = Field(0.6, ge=0, le=1)
     #: Tier 2 confidence band considered ambiguous -> escalate to Tier 3.
     t3_ambiguous_low: float = Field(0.4, ge=0, le=1)
+    #: Upper bound of the ambiguous band (above it, Tier 2 is confident enough on its own).
     t3_ambiguous_high: float = Field(0.7, ge=0, le=1)
     #: Max Tier 2 invocations per node per second.
     t2_rate_per_second: float = Field(500.0, gt=0)
     #: Baseline warm-up (flows per entity) before Tier 1 scores are trusted.
     baseline_warmup_flows: int = Field(200, ge=10)
+    #: Isolation Forest size (accuracy vs CPU).
     isolation_forest_trees: int = Field(100, ge=10, le=1000)
 
 
 class LlmSettings(_Section):
+    #: `offline` always uses the deterministic heuristic advisor (no data leaves the host).
     provider: Literal["anthropic", "offline"] = "anthropic"
+    #: Claude model used for triage, rule drafting and narration.
     model: str = "claude-opus-5"
+    #: Anthropic API key; falls back to `ANTHROPIC_API_KEY`. Without one, Tier 3 runs offline.
     api_key: SecretStr | None = None
+    #: Output token ceiling per Tier 3 call.
     max_tokens: int = Field(16000, ge=256, le=64000)
+    #: Reasoning effort for Tier 3 calls (cost vs thoroughness).
     effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
     #: Server-side refusal fallbacks (beta ``server-side-fallback-2026-07-01``).
     server_side_fallbacks: bool = True
     #: Hard budget on Tier 3 invocations per hour, per cluster (blueprint §5.4).
     max_calls_per_hour: int = Field(120, ge=0)
+    #: Per-request timeout for Tier 3 calls; on timeout the heuristic advisor answers.
     timeout_seconds: float = Field(60.0, gt=0)
 
 
@@ -68,10 +76,15 @@ class PolicySettings(_Section):
 
 
 class AuthSettings(_Section):
+    #: HMAC key for console sessions. Required in production (`openssl rand -base64 48`).
     secret_key: SecretStr | None = None
+    #: Console session lifetime.
     access_token_ttl_seconds: int = Field(8 * 3600, ge=60)
+    #: Email of the admin account created on first start.
     bootstrap_admin_email: str = "admin@neurawall.local"
+    #: Initial admin password. If unset, one is generated into `data_dir/initial-admin-password.txt`.
     bootstrap_admin_password: SecretStr | None = None
+    #: Login attempts allowed per minute per client IP and per account.
     login_rate_per_minute: int = Field(10, ge=1)
 
 
@@ -82,14 +95,23 @@ class Settings(BaseSettings):
         extra="forbid",
     )
 
+    #: `production` enforces a configured secret key and marks the console accordingly.
     environment: Literal["development", "production", "test"] = "development"
+    #: Holds the SQLite database (if used), bundle-signing key and bootstrap secret. Mode 0700.
     data_dir: Path = Path("./data")
+    #: SQLAlchemy URL, e.g. `postgresql+psycopg://user:pass@host/neurawall`. Empty = SQLite in data_dir.
     database_url: str | None = None
+    #: Listen address.
     host: str = "0.0.0.0"  # noqa: S104 - server binds all interfaces inside containers
+    #: Listen port.
     port: int = Field(8080, ge=1, le=65535)
+    #: Externally reachable URL (shown in enrollment instructions; `https://` enables HSTS).
     public_url: str = "http://localhost:8080"
+    #: Allowed browser origins if the console is served from another origin (normally empty).
     cors_origins: list[str] = []
+    #: Log verbosity.
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    #: Structured JSON logs (recommended in production) instead of human-readable text.
     log_json: bool = True
     #: Generate synthetic traffic from a built-in demo sensor (for evaluation / sales demos).
     demo_mode: bool = False

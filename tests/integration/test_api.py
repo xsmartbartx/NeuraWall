@@ -65,14 +65,13 @@ def test_rbac_viewer_cannot_approve_and_must_change_password(client):
     assert r.status_code == 201
     vh = login(client, "viewer@corp.io", "Viewer-Pass-12")
     assert client.get("/api/v1/rules", headers=vh).status_code == 403  # must change password
-    assert (
-        client.post(
-            "/api/v1/auth/password",
-            headers=vh,
-            json={"current_password": "Viewer-Pass-12", "new_password": "Viewer-Pass-34!"},
-        ).status_code
-        == 200
+    r = client.post(
+        "/api/v1/auth/password",
+        headers=vh,
+        json={"current_password": "Viewer-Pass-12", "new_password": "Viewer-Pass-34!"},
     )
+    assert r.status_code == 200
+    vh = {"Authorization": f"Bearer {r.json()['access_token']}"}  # old sessions are revoked
     assert client.get("/api/v1/rules", headers=vh).status_code == 200
     assert (
         client.patch("/api/v1/rules/R-000001", headers=vh, json={"enabled": False}).status_code

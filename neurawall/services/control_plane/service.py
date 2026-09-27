@@ -160,6 +160,20 @@ class ControlPlane:
                     s.add(db.RuleRow(id=rule.id, data=rule.model_dump(mode="json")))
         if not has_bundle:
             self.publish_bundle(SYSTEM_ACTOR, note="initial bundle", immediate=True)
+            return
+        with self.db.session() as s:
+            latest = s.scalars(
+                select(db.BundleRow).order_by(db.BundleRow.version.desc()).limit(1)
+            ).first()
+            signed_by = latest.envelope.get("key_id") if latest else None
+        if signed_by != self.signer.key_id:
+            # Signing key rotated: re-sign the current rule set so re-enrolled nodes accept it.
+            log.warning(
+                "bundle-signing key changed; publishing a re-signed bundle",
+                previous_key=signed_by,
+                current_key=self.signer.key_id,
+            )
+            self.publish_bundle(SYSTEM_ACTOR, note="re-signed after key rotation", immediate=True)
 
     def _create_bootstrap_admin(self, s: Session) -> None:
         cfg = self.settings.auth

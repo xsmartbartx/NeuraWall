@@ -1,0 +1,23 @@
+# Local evaluation: one container, SQLite, synthetic demo traffic. Not for production.
+#   docker compose -f deploy/compose/quickstart.yml up
+#   open http://localhost:8080  (admin@neurawall.local / Quickstart-Admin-1!)
+name: neurawall-quickstart
+
+services:
+  neurawall:
+    image: ${NEURAWALL_IMAGE:-neurawall:latest}
+    build:
+      context: ../..
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      NEURAWALL_ENVIRONMENT: development
+      NEURAWALL_DEMO_MODE: "true"
+      NEURAWALL_AUTH__BOOTSTRAP_ADMIN_PASSWORD: Quickstart-Admin-1!
+      NEURAWALL_POLICY__ROLLOUT_STAGE_SECONDS: "60"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - quickstart:/data
+
+volumes:
+  quickstart:
