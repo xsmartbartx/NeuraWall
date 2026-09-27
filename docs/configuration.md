@@ -45,6 +45,7 @@ Configuration is layered: **defaults → YAML file → environment → runtime o
 | `llm.max_tokens` | `NEURAWALL_LLM__MAX_TOKENS` | int | `16000` | Output token ceiling per Tier 3 call. |
 | `llm.effort` | `NEURAWALL_LLM__EFFORT` | `low` / `medium` / `high` / `xhigh` / `max` | `high` | Reasoning effort for Tier 3 calls (cost vs thoroughness). |
 | `llm.server_side_fallbacks` | `NEURAWALL_LLM__SERVER_SIDE_FALLBACKS` | bool | `True` | Server-side refusal fallbacks (beta ``server-side-fallback-2026-07-01``). |
+| `llm.workspace_id` | `NEURAWALL_LLM__WORKSPACE_ID` | str \| None | — | Anthropic workspace id, required when the API key is not scoped to a workspace (sent as the `anthropic-workspace-id` header). Falls back to `ANTHROPIC_WORKSPACE_ID`. |
 | `llm.max_calls_per_hour` | `NEURAWALL_LLM__MAX_CALLS_PER_HOUR` | int | `120` | Hard budget on Tier 3 invocations per hour, per cluster (blueprint §5.4). |
 | `llm.timeout_seconds` | `NEURAWALL_LLM__TIMEOUT_SECONDS` | float | `60.0` | Per-request timeout for Tier 3 calls; on timeout the heuristic advisor answers. |
 

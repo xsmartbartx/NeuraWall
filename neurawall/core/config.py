@@ -52,6 +52,9 @@ class LlmSettings(_Section):
     effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
     #: Server-side refusal fallbacks (beta ``server-side-fallback-2026-07-01``).
     server_side_fallbacks: bool = True
+    #: Anthropic workspace id, required when the API key is not scoped to a workspace
+    #: (sent as the `anthropic-workspace-id` header). Falls back to `ANTHROPIC_WORKSPACE_ID`.
+    workspace_id: str | None = None
     #: Hard budget on Tier 3 invocations per hour, per cluster (blueprint §5.4).
     max_calls_per_hour: int = Field(120, ge=0)
     #: Per-request timeout for Tier 3 calls; on timeout the heuristic advisor answers.
@@ -205,6 +208,10 @@ class Settings(BaseSettings):
             path.write_text(secrets.token_urlsafe(48))
             path.chmod(0o600)
         return path.read_text().strip()
+
+    @property
+    def anthropic_workspace_id(self) -> str | None:
+        return self.llm.workspace_id or os.environ.get("ANTHROPIC_WORKSPACE_ID") or None
 
     @property
     def anthropic_api_key(self) -> str | None:

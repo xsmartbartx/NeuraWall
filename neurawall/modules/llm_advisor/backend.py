@@ -57,12 +57,18 @@ class ClaudeBackend:
         effort: str,
         timeout_seconds: float,
         server_side_fallbacks: bool,
+        workspace_id: str | None = None,
     ) -> None:
         self.model = model
         self.max_tokens = max_tokens
         self.effort = effort
         self.server_side_fallbacks = server_side_fallbacks
-        self._client = anthropic.Anthropic(api_key=api_key, timeout=timeout_seconds, max_retries=2)
+        self._client = anthropic.Anthropic(
+            api_key=api_key,
+            timeout=timeout_seconds,
+            max_retries=2,
+            default_headers={"anthropic-workspace-id": workspace_id} if workspace_id else None,
+        )
 
     def generate(self, task: str, context: str, output: type[T]) -> T:
         kwargs: dict[str, object] = {}

@@ -161,6 +161,7 @@ class ControlPlane:
             effort=llm.effort,
             timeout_seconds=llm.timeout_seconds,
             server_side_fallbacks=llm.server_side_fallbacks,
+            workspace_id=self.settings.anthropic_workspace_id,
         )
 
     def _bootstrap(self) -> None:

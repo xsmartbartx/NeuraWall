@@ -110,3 +110,19 @@ def test_refusal_is_recoverable(stub):
     stub.stop_reason = "refusal"
     with pytest.raises(RecoverableError, match="declined"):
         backend().generate("t", "c", schemas.LlmRuleDraft)
+
+
+def test_workspace_header_is_sent_when_configured(stub):
+    ClaudeBackend(
+        api_key="sk-ant-test",
+        model="claude-opus-5",
+        max_tokens=1000,
+        effort="low",
+        timeout_seconds=10,
+        server_side_fallbacks=False,
+        workspace_id="wrkspc_123",
+    ).generate("t", "c", schemas.LlmRuleDraft)
+    headers = {k.lower(): v for k, v in stub.captured[0]["headers"].items()}
+    assert headers["anthropic-workspace-id"] == "wrkspc_123"
+    backend().generate("t", "c", schemas.LlmRuleDraft)
+    assert "anthropic-workspace-id" not in {k.lower() for k in stub.captured[1]["headers"]}

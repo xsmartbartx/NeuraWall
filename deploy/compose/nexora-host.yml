@@ -52,6 +52,7 @@ services:
       NEURAWALL_BILLING__PRICE_ENTERPRISE_MONTH: ${NEURAWALL_BILLING__PRICE_ENTERPRISE_MONTH:-}
       NEURAWALL_BILLING__PRICE_ENTERPRISE_YEAR: ${NEURAWALL_BILLING__PRICE_ENTERPRISE_YEAR:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
       FORWARDED_ALLOW_IPS: "*"   # only reachable through the edge Caddy on this network
     volumes:
       - cpdata:/data            # bundle-signing key: back it up
