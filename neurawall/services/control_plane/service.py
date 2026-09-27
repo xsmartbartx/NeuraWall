@@ -755,7 +755,9 @@ class ControlPlane:
     def _attach_alert(self, s: Session, node_id: str, ev: Evidence, v: Verdict) -> tuple[int, bool]:
         f = ev.flow
         labels = sorted({c.label.value for c in ev.malicious_labels})
-        key = f"{f.src_ip}|{v.rule_id or (labels[0] if labels else 'anomaly')}"
+        # One incident = one source + one threat. Group by label first so flows that did and
+        # did not cross a rule's confidence threshold land in the same alert.
+        key = f"{f.src_ip}|{labels[0] if labels else v.rule_id or 'anomaly'}"
         now = time.time()
         alert = s.scalars(
             select(db.Alert).where(

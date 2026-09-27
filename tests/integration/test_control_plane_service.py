@@ -49,9 +49,11 @@ def test_ingest_blocks_injection_and_creates_alert(cp):
     assert total >= 1
     related = [a for a in alerts if "sql_injection" in a.labels]
     assert sum(a.flow_count for a in related) == 10
-    blocked = next(a for a in related if a.group_key.endswith("R-000001"))
-    assert blocked.blocked_count == blocked.flow_count == len(out.verdicts)
-    assert blocked.tier3_pending
+    # All flows of one source + threat form a single incident, blocked or not.
+    assert len(related) == 1
+    incident = related[0]
+    assert incident.blocked_count == len(out.verdicts) and incident.flow_count == 10
+    assert incident.tier3_pending
 
 
 def test_tier3_triage_drafts_rule_and_approval_publishes_bundle(cp):
@@ -206,7 +208,7 @@ def test_triage_skips_enforced_and_dedupes_drafts(cp):
     gen = TrafficGenerator(seed=10)
     warm(cp, gen)
     cp.ingest("n1", gen.scenario("dns_tunnel", 6))
-    cp.ingest("n1", gen.scenario("sql_injection", 10))
+    cp.ingest("n1", gen.scenario("command_injection", 10))
     alerts = cp.list_alerts()[0]
     for a in alerts:
         cp.triage_alert(a.id)
