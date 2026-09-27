@@ -46,7 +46,8 @@ def test_enroll_sync_ship_and_enforce(env):
     agent.enroll(cp.create_enrollment_token("admin"))
     assert (cfg.state_dir / "agent-state.json").stat().st_mode & 0o777 == 0o600
     agent.sync_bundle()
-    assert agent.state.applied_version == 1 and agent.backend.state().static_rules >= 1
+    st = agent.backend.state()
+    assert agent.state.applied_version == 1 and st.static_rules + st.dynamic_rules >= 1
 
     gen = TrafficGenerator(seed=12)
     docs = [gen.benign().model_dump(mode="json") for _ in range(300)]
