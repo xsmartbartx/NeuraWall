@@ -25,7 +25,7 @@ RUN uv sync --frozen --no-dev --extra postgres
 FROM python:3.12-slim AS runtime
 LABEL org.opencontainers.image.title="NeuraWall" \
       org.opencontainers.image.description="AI-assisted firewall: deterministic enforcement, three-tier inference, human-approved policy" \
-      org.opencontainers.image.licenses="Apache-2.0"
+      org.opencontainers.image.licenses="LicenseRef-Proprietary"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends nftables ca-certificates tini \
  && rm -rf /var/lib/apt/lists/* \

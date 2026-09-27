@@ -73,5 +73,5 @@ that the LLM advisor can never import the policy engine or datapath are enforced
 
 ## License
 
-See [LICENSE](LICENSE). Commercial use, hosting and redistribution
-are permitted under its terms.
+Proprietary. All rights reserved. See [LICENSE](LICENSE). Use, hosting or redistribution
+requires written authorization from the copyright holder.
