@@ -68,3 +68,24 @@ def test_batch_latency_budget():
     eng.score_batch(flows)
     per_flow_ms = (time.perf_counter() - t) * 1000 / len(flows)
     assert per_flow_ms < 1.0, per_flow_ms  # blueprint §5.1: < 1 ms per flow
+
+
+def test_new_hosts_ramping_up_are_not_anomalous():
+    """Regression: a per-host rate baseline flagged every new host during its first minute."""
+    gen = TrafficGenerator(seed=17, hosts=40)
+    eng = AnomalyEngine(warmup_flows=200, trees=50)
+    novel_like = 0
+    total = 0
+    for _ in range(30):  # 30 batches of live-rate traffic
+        scores = eng.score_batch([gen.benign() for _ in range(60)])
+        novel_like += sum(s.score >= 0.8 for s in scores)
+        total += len(scores)
+    assert novel_like / total < 0.005, novel_like / total
+
+
+def test_flood_from_one_source_is_detected():
+    gen = TrafficGenerator(seed=18)
+    eng = _trained_engine(gen, 1000)
+    flood = gen.scenario("brute_force", 150)
+    scores = eng.score_batch(flood)
+    assert max(s.score for s in scores[-50:]) >= 0.8

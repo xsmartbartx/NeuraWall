@@ -37,6 +37,12 @@ _scored = REGISTRY.counter("neurawall_tier1_scored_total", "Flows scored by Tier
 _latency = REGISTRY.histogram("neurawall_tier1_batch_seconds", "Tier 1 batch scoring latency")
 
 
+#: A source is flooding when it opens this many times more connections than a typical
+#: source, and at least this many per minute in absolute terms.
+FLOOD_RATIO = 3.0
+FLOOD_MIN_CONNS_PER_MINUTE = 60.0
+
+
 def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
@@ -85,7 +91,9 @@ class AnomalyEngine:
         self._seed = seed
         self._window = SourceWindow()
         self._baselines: OrderedDict[tuple[str, int, int], Ewma] = OrderedDict()
-        self._rates: OrderedDict[str, Ewma] = OrderedDict()
+        #: Population baseline of log(connections/min per source): floods are judged against
+        #: what sources typically do, not against a host's own (lagging) history.
+        self._population_rate = Ewma()
         self._reservoir: list[np.ndarray] = []
         self._seen = 0
         self._since_fit = 0
@@ -156,10 +164,13 @@ class AnomalyEngine:
 
         # Connection-rate change per source.
         rate_x = float(x[FEATURE_NAMES.index("src_conn_rate")])
-        rate_b = self._rates.get(flow.src_ip)
-        rz = rate_b.zscore(rate_x) if rate_b else 0.0
+        conns_per_min = math.expm1(rate_x)
+        flood = 0.0
+        if conns_per_min >= FLOOD_MIN_CONNS_PER_MINUTE and self._population_rate.n >= 50:
+            excess = rate_x - self._population_rate.mean  # log-ratio vs a typical source
+            flood = _sigmoid((excess - math.log(FLOOD_RATIO)) * 5.0)
         port_ent = float(x[FEATURE_NAMES.index("src_port_entropy")])
-        rate = max(_sigmoid(rz - 4.0) if rz > 0 else 0.0, _sigmoid((port_ent - 4.0) * 3.0))
+        rate = max(flood, _sigmoid((port_ent - 4.0) * 3.0))
         if rate > 0.3:
             contributions["connection_rate"] = rate
 
@@ -191,13 +202,7 @@ class AnomalyEngine:
             if len(self._baselines) > self.max_baselines:
                 self._baselines.popitem(last=False)
         base.update(x[0])
-        rate = self._rates.get(flow.src_ip)
-        if rate is None:
-            rate = Ewma()
-            self._rates[flow.src_ip] = rate
-            if len(self._rates) > self.max_baselines:
-                self._rates.popitem(last=False)
-        rate.update(float(x[FEATURE_NAMES.index("src_conn_rate")]))
+        self._population_rate.update(float(x[FEATURE_NAMES.index("src_conn_rate")]), alpha=0.01)
 
         # Reservoir sampling keeps a uniform sample of history for (re)training.
         if len(self._reservoir) < self.reservoir_size:
