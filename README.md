@@ -73,5 +73,5 @@ that the LLM advisor can never import the policy engine or datapath are enforced
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE). Commercial use, hosting and redistribution
+See [LICENSE](LICENSE). Commercial use, hosting and redistribution
 are permitted under its terms.
