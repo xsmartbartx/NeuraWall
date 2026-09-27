@@ -73,3 +73,9 @@ def test_claimed_client():
     assert claimed_client("Mozilla/5.0 ... Chrome/128.0 Safari/537.36") == "chrome"
     assert claimed_client("Mozilla/5.0 ... Chrome/128.0 Edg/128.0") == "edge"
     assert claimed_client("curl/8.0") is None
+
+
+def test_direction_rules_are_not_compiled_statically():
+    inbound = make_rule(9, match=RuleMatch(directions=["inbound"], dst_ports=[23]))
+    assert not is_static(inbound)
+    assert "R-000009" not in render_ruleset(PolicyBundle(version=1, rules=[inbound]))

@@ -70,10 +70,14 @@ class EnforcementBackend(Protocol):
 
 
 def is_static(rule: Rule) -> bool:
-    """A rule the kernel can evaluate on its own (pure L3/L4 match)."""
+    """A rule the kernel can evaluate on its own (pure L3/L4 match).
+
+    Direction constraints need knowledge of the site's local networks, which the
+    kernel ruleset does not have, so they are enforced dynamically (never over-block).
+    """
     m = rule.match
     return not (m.sni_suffixes or m.dns_suffixes or m.http_path_prefixes or m.ja3 or m.labels
-                or m.min_anomaly_score is not None)
+                or m.directions or m.min_anomaly_score is not None)
 
 
 def enforceable(rule: Rule) -> bool:
