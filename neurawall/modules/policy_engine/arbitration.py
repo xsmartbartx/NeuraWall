@@ -72,7 +72,7 @@ class PolicyEngine:
         if ev.anomaly and ev.anomaly.score >= self.bundle.anomaly_alert_threshold:
             return True
         return any(
-            c.label != ThreatLabel.BENIGN and c.confidence >= self.bundle.classifier_enforce_threshold
+            c.label != ThreatLabel.BENIGN and c.confidence >= self.bundle.classifier_alert_threshold
             for c in ev.classifications
         )
 

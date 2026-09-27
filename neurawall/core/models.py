@@ -272,7 +272,9 @@ class Rule(Frozen):
 class SimulationResult(Frozen):
     flows_evaluated: int
     flows_matched: int
-    blast_radius: Probability  # fraction of evaluated traffic affected
+    #: Fraction of *legitimate* evaluated traffic the rule would affect (blueprint §17).
+    blast_radius: Probability
+    legitimate_matched: int = 0
     would_block: int
     affected_sources: int
     affected_destinations: int
@@ -328,7 +330,8 @@ class PolicyBundle(Frozen):
     default_action: Literal[Action.ALLOW, Action.ALERT] = Action.ALLOW
     rules: Annotated[list[Rule], Field(max_length=10000)]
     anomaly_alert_threshold: Probability = 0.8
-    classifier_enforce_threshold: Probability = 0.9
+    #: Without a matching rule, a malicious label at/above this confidence raises an alert.
+    classifier_alert_threshold: Probability = 0.7
 
 
 class SignedEnvelope(Frozen):

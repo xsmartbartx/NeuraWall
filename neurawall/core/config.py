@@ -57,6 +57,14 @@ class PolicySettings(_Section):
     simulation_window_seconds: int = Field(7 * 24 * 3600, ge=60)
     #: Nodes warn when running a bundle older than this (blueprint §3.3).
     bundle_ttl_warning_seconds: int = Field(24 * 3600, ge=60)
+    #: Four-eyes: the approver of a rule change must differ from its author.
+    require_four_eyes: bool = False
+    #: Minimum dwell time per canary stage before auto-advance (5% -> 25% -> 100%).
+    rollout_stage_seconds: int = Field(300, ge=0)
+    #: Auto-rollback if canary nodes block this much more traffic than the rest.
+    rollback_block_rate_increase: float = Field(0.02, ge=0, le=1)
+    #: Seed a starter rule pack on first boot.
+    starter_rules: bool = True
 
 
 class AuthSettings(_Section):
@@ -83,6 +91,8 @@ class Settings(BaseSettings):
     cors_origins: list[str] = []
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_json: bool = True
+    #: Generate synthetic traffic from a built-in demo sensor (for evaluation / sales demos).
+    demo_mode: bool = False
     #: Flow records retained for simulation / investigation.
     flow_retention_seconds: int = Field(7 * 24 * 3600, ge=3600)
 
