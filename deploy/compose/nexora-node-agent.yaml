@@ -1,0 +1,7 @@
+# NeuraWall agent watching the NEXORA host itself. dry-run: detects and reports, never blocks.
+control_plane_url: http://neurawall-control-plane-1:8080
+state_dir: /var/lib/neurawall-agent
+name: nexora-platform
+backend: dry-run
+source: zeek
+source_path: /zeek

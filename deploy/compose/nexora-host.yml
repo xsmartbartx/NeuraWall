@@ -53,11 +53,47 @@ services:
       NEURAWALL_BILLING__PRICE_ENTERPRISE_YEAR: ${NEURAWALL_BILLING__PRICE_ENTERPRISE_YEAR:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
+      NEURAWALL_LLM__MAX_CALLS_PER_HOUR: ${NEURAWALL_LLM__MAX_CALLS_PER_HOUR:-120}
       FORWARDED_ALLOW_IPS: "*"   # only reachable through the edge Caddy on this network
     volumes:
       - cpdata:/data            # bundle-signing key: back it up
     mem_limit: 2g
 
+  # --- Optional watch-only node for the NEXORA host itself (profile "node"):
+  #   deploy.sh neurawall zeek agent
+  zeek:
+    profiles: ["node"]
+    image: zeek/zeek:lts
+    restart: unless-stopped
+    network_mode: host          # sees the host's real interface
+    cap_add: [NET_RAW, NET_ADMIN]
+    working_dir: /logs
+    command: ["zeek", "-C", "-i", "${NEURAWALL_NODE_IFACE:-enp0s6}", "local", "/etc/nexora-node.zeek"]
+    volumes:
+      - zeeklogs:/logs
+      - ./nexora-node.zeek:/etc/nexora-node.zeek:ro
+    mem_limit: 1g
+
+  agent:
+    profiles: ["node"]
+    image: neurawall:host        # built by the control-plane service
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        test -f /var/lib/neurawall-agent/agent-state.json ||
+        neurawall agent enroll --config /etc/neurawall/agent.yaml --token "$$NEURAWALL_ENROLLMENT_TOKEN";
+        exec neurawall agent run --config /etc/neurawall/agent.yaml
+    environment:
+      NEURAWALL_ENROLLMENT_TOKEN: ${NEURAWALL_NODE_ENROLLMENT_TOKEN:-}
+    volumes:
+      - zeeklogs:/zeek:ro
+      - agentstate:/var/lib/neurawall-agent
+      - ./nexora-node-agent.yaml:/etc/neurawall/agent.yaml:ro
+    mem_limit: 512m
+
 volumes:
   pgdata:
   cpdata:
+  zeeklogs:
+  agentstate:
