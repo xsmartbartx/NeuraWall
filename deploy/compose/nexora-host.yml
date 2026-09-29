@@ -91,6 +91,8 @@ services:
       - agentstate:/var/lib/neurawall-agent
       - ./nexora-node-agent.yaml:/etc/neurawall/agent.yaml:ro
     mem_limit: 512m
+    healthcheck:
+      disable: true             # the image's check probes the control plane's :8080
 
 volumes:
   pgdata:
