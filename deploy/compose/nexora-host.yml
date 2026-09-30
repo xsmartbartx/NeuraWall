@@ -72,6 +72,10 @@ services:
     volumes:
       - zeeklogs:/logs
       - ./nexora-node.zeek:/etc/nexora-node.zeek:ro
+      # Zeek's geo-data.zeek (SSH::watched_countries) looks up GeoLite2-City.mmdb
+      # at this path by default; the host has it but the container's own
+      # filesystem doesn't, so lookups silently no-op without this mount.
+      - /usr/share/GeoIP:/usr/share/GeoIP:ro
     mem_limit: 1g
 
   agent:
