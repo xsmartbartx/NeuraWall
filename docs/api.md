@@ -21,7 +21,7 @@ curl -s https://nw.example.com/api/v1/alerts?status=open -H "Authorization: Bear
 
 | Area | Endpoints | Permission |
 |---|---|---|
-| Auth | `POST /auth/login`, `GET /auth/me`, `POST /auth/password` | — |
+| Auth | `POST /auth/login`, `POST /auth/sso` (opt-in, see security.md), `GET /auth/me`, `POST /auth/password` | — |
 | Dashboard | `GET /dashboard?hours=` | read |
 | Flows | `GET /flows` (filters: `q`, `action`, `label`, `node`, `alert_id`, `min_score`, `hours`), `GET /flows/{id}`, `POST /flows/{id}/explain` | read / advisor |
 | Alerts | `GET /alerts`, `GET/PATCH /alerts/{id}`, `POST /alerts/{id}/triage`, `POST /alerts/{id}/narrate` | read / triage / advisor |
