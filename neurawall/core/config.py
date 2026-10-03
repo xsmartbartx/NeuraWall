@@ -133,6 +133,15 @@ class AuthSettings(_Section):
     bootstrap_admin_password: SecretStr | None = None
     #: Login attempts allowed per minute per client IP and per account.
     login_rate_per_minute: int = Field(10, ge=1)
+    #: Clerk JWKS URL (e.g. `https://clerk.example.com/.well-known/jwks.json`). Setting it
+    #: enables `POST /api/v1/auth/sso`, which signs an *existing* user in from a verified
+    #: Clerk session token. Unset (the default) = SSO is off and the endpoint returns 404.
+    sso_jwks_url: str | None = None
+    #: If set, the token's `iss` claim must equal this (the Clerk frontend API URL).
+    sso_issuer: str | None = None
+    #: If set, the token must carry this Clerk organisation id (`org_id`), so only members
+    #: of one organisation can use SSO.
+    sso_required_org_id: str | None = None
 
 
 class Settings(BaseSettings):

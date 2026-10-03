@@ -84,3 +84,27 @@ provenance attestation, and run as a non-root user.
 ## Reporting a vulnerability
 
 See [SECURITY.md](../SECURITY.md).
+
+## Optional single sign-on (Clerk)
+
+Off by default. Setting `NEURAWALL_AUTH__SSO_JWKS_URL` enables
+`POST /api/v1/auth/sso` with `{"token": "<Clerk session token>"}`.
+
+What it does and does not do:
+
+- Clerk only proves identity. The token is verified (RS256 signature against the
+  JWKS, expiry, and `iss` when `SSO_ISSUER` is set) and its `email` claim is
+  mapped to an **existing, active** NeuraWall user, who signs in with **their own
+  NeuraWall role**. Roles, deactivation and the four-eyes approval rule are
+  unchanged and still live in NeuraWall.
+- It never creates users and never takes a role from the identity provider. An
+  unknown or deactivated email is refused.
+- Set `NEURAWALL_AUTH__SSO_REQUIRED_ORG_ID` to accept only members of one Clerk
+  organisation. The Clerk instance must require verified email addresses.
+- Every refusal returns the same generic 403 so a caller cannot tell which check
+  failed; the endpoint shares the login IP rate limit; each success is audited as
+  `auth.login.sso`.
+- Password login is unaffected and remains available.
+
+The console has no SSO button yet; a front end obtains a Clerk session token and
+calls this endpoint.
