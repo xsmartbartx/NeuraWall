@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import func, or_, select
 
 from neurawall import __version__
-from neurawall.core.errors import PolicyViolation
+from neurawall.core.errors import NotFound, PolicyViolation
 from neurawall.core.models import (
     Action,
     DraftSource,
@@ -23,6 +23,7 @@ from neurawall.core.models import (
 from neurawall.core.telemetry import REGISTRY
 from neurawall.modules.flow_collector.ingest import parse_flows
 from neurawall.security.rbac import Permission, Role, permissions_for
+from neurawall.security.sso import verify_sso_token
 from neurawall.services.control_plane import db
 from neurawall.services.control_plane.api import serializers as ser
 from neurawall.services.control_plane.api.deps import (
@@ -98,6 +99,10 @@ class LoginIn(Body):
     password: Annotated[str, Field(max_length=256)]
 
 
+class SsoIn(Body):
+    token: Annotated[str, Field(min_length=20, max_length=8192)]
+
+
 class PasswordChangeIn(Body):
     current_password: Annotated[str, Field(max_length=256)]
     new_password: Annotated[str, Field(min_length=12, max_length=256)]
@@ -114,6 +119,31 @@ def login(body: LoginIn, request: Request, cp: CP) -> dict[str, Any]:
         "access_token": token,
         "token_type": "bearer",
         "expires_in": cp.settings.auth.access_token_ttl_seconds,
+        "user": ser.user(user),
+    }
+
+
+@api.post("/auth/sso", tags=["auth"])
+def login_sso(body: SsoIn, request: Request, cp: CP) -> dict[str, Any]:
+    """Sign in from a Clerk session token. 404 unless `auth.sso_jwks_url` is set."""
+    auth = cp.settings.auth
+    if not auth.sso_jwks_url:
+        raise NotFound("single sign-on is not enabled")
+    limiter = request.app.state.login_limiter
+    client = request.client.host if request.client else "unknown"
+    if not limiter.allow(client):
+        raise PolicyViolation("too many login attempts; try again in a minute")
+    identity = verify_sso_token(
+        body.token,
+        jwks_url=auth.sso_jwks_url,
+        issuer=auth.sso_issuer,
+        required_org_id=auth.sso_required_org_id,
+    )
+    token, user = cp.login_sso(identity.email)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": auth.access_token_ttl_seconds,
         "user": ser.user(user),
     }
 

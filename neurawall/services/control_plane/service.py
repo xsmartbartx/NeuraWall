@@ -273,6 +273,24 @@ class ControlPlane:
         self.audit(user.email, "auth.login", f"user:{user.id}")
         return token, user
 
+    def login_sso(self, email: str) -> tuple[str, db.User]:
+        """Sign in an *existing, active* user whose email Clerk has verified.
+        No user is created and no role is taken from the identity provider."""
+        with self.db.session() as s:
+            user = s.scalars(select(db.User).where(db.User.email == email.lower().strip())).first()
+            if user is None or not user.active:
+                raise PolicyViolation("single sign-on was not accepted")
+            user.last_login = time.time()
+            token = issue_token(
+                subject=str(user.id),
+                role=user.role,
+                secret=self.settings.jwt_secret,
+                ttl_seconds=self.settings.auth.access_token_ttl_seconds,
+            )
+            s.expunge(user)
+        self.audit(user.email, "auth.login.sso", f"user:{user.id}")
+        return token, user
+
     def get_user(self, user_id: int) -> db.User:
         with self.db.session() as s:
             u = s.get(db.User, user_id)
