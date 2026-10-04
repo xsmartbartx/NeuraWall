@@ -36,7 +36,7 @@ export function Layout() {
         <div className="brand"><Logo /><div>NeuraWall<small>AI Firewall</small></div></div>
         <nav className="nav" aria-label="Main">
           <div className="nav-section">Monitor</div>
-          {link("/", "Overview")}
+          {link("/", "Dashboard")}
           {link("/alerts", "Alerts", openAlerts, critical > 0)}
           {link("/flows", "Flow explorer")}
           <div className="nav-section">Policy</div>
