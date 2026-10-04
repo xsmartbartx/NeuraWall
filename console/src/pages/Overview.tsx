@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BarList, VerdictTimeline } from "../components/charts";
 import { Badge, Card, ErrorBox, Kpi, Labels, Loading, PageHead, Meter } from "../components/ui";
@@ -10,7 +10,7 @@ const WINDOWS = [1, 6, 24, 168];
 
 function healthScore(d: Dashboard): number {
   let score = 100;
-  if (d.nodes.total) score -= Math.round((1 - d.nodes.online / d.nodes.total) * 30);
+  if (d.nodes.total === 0) score -= 45;\n  else score -= Math.round((1 - d.nodes.online / d.nodes.total) * 30);
   const alerts = Object.values(d.open_alerts).reduce((sum, n) => sum + n, 0);
   score -= Math.min(30, alerts * 3);
   score -= Math.min(20, d.pending_drafts * 4);
@@ -69,7 +69,7 @@ export function Overview() {
 
       <section className="customer-hero">
         <div className="customer-health">
-          <div className="health-ring" style={{ "--score": score } as React.CSSProperties} aria-label={`Security posture ${score} out of 100`}>
+          <div className="health-ring" style={{ "--score": score } as CSSProperties} aria-label={`Security posture ${score} out of 100`}>
             <div><strong>{score}</strong><span>/100</span></div>
           </div>
           <div>
