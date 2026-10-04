@@ -10,7 +10,8 @@ const WINDOWS = [1, 6, 24, 168];
 
 function healthScore(d: Dashboard): number {
   let score = 100;
-  if (d.nodes.total === 0) score -= 45;\n  else score -= Math.round((1 - d.nodes.online / d.nodes.total) * 30);
+  if (d.nodes.total === 0) score -= 45;
+  else score -= Math.round((1 - d.nodes.online / d.nodes.total) * 30);
   const alerts = Object.values(d.open_alerts).reduce((sum, n) => sum + n, 0);
   score -= Math.min(30, alerts * 3);
   score -= Math.min(20, d.pending_drafts * 4);
