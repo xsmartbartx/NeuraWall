@@ -139,6 +139,12 @@ class AuthSettings(_Section):
     sso_jwks_url: str | None = None
     #: If set, the token's `iss` claim must equal this (the Clerk frontend API URL).
     sso_issuer: str | None = None
+    #: If set, the token's `aud` claim must equal this (the Clerk JWT template should set it),
+    #: so a Clerk token minted for another service cannot be replayed here.
+    sso_audience: str | None = None
+    #: Where the console sends the browser to obtain a token (the NEXORA account app's
+    #: handoff URL). Setting it shows "Sign in with NEXORA" on the console login page.
+    sso_login_url: str | None = None
     #: If set, the token must carry this Clerk organisation id (`org_id`), so only members
     #: of one organisation can use SSO.
     sso_required_org_id: str | None = None

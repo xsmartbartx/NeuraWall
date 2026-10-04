@@ -38,6 +38,7 @@ def verify_sso_token(
     *,
     jwks_url: str,
     issuer: str | None = None,
+    audience: str | None = None,
     required_org_id: str | None = None,
     get_signing_key: GetSigningKey | None = None,
 ) -> SsoIdentity:
@@ -56,7 +57,8 @@ def verify_sso_token(
             key,
             algorithms=_ALGORITHMS,
             issuer=issuer,
-            options={"verify_aud": False, "require": ["exp", "sub"]},
+            audience=audience,
+            options={"verify_aud": audience is not None, "require": ["exp", "sub"]},
         )
     except jwt.PyJWTError as exc:
         raise denied from exc

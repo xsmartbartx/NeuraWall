@@ -123,6 +123,15 @@ def login(body: LoginIn, request: Request, cp: CP) -> dict[str, Any]:
     }
 
 
+@api.get("/auth/sso/config", tags=["auth"])
+def sso_config(cp: CP) -> dict[str, Any]:
+    """Public: lets the login page know whether to offer "Sign in with NEXORA" and where to
+    send the browser. Exposes no secret: both values are already visible to any visitor."""
+    auth = cp.settings.auth
+    enabled = bool(auth.sso_jwks_url and auth.sso_login_url)
+    return {"enabled": enabled, "login_url": auth.sso_login_url if enabled else None}
+
+
 @api.post("/auth/sso", tags=["auth"])
 def login_sso(body: SsoIn, request: Request, cp: CP) -> dict[str, Any]:
     """Sign in from a Clerk session token. 404 unless `auth.sso_jwks_url` is set."""
@@ -137,6 +146,7 @@ def login_sso(body: SsoIn, request: Request, cp: CP) -> dict[str, Any]:
         body.token,
         jwks_url=auth.sso_jwks_url,
         issuer=auth.sso_issuer,
+        audience=auth.sso_audience,
         required_org_id=auth.sso_required_org_id,
     )
     token, user = cp.login_sso(identity.email)

@@ -108,3 +108,14 @@ What it does and does not do:
 
 The console has no SSO button yet; a front end obtains a Clerk session token and
 calls this endpoint.
+
+### "Sign in with NEXORA" on the console login page
+
+Set `NEURAWALL_AUTH__SSO_LOGIN_URL` (in addition to `SSO_JWKS_URL`) and the login page shows a
+button. The browser goes to the account app, which returns it here with a short-lived Clerk token
+in the URL **fragment** (never sent to a server, `Referer` or access log). A random `state` the
+console generated first must come back unchanged; a token it did not ask for is discarded without
+calling the server. The fragment is removed from the address bar immediately.
+
+Also set `NEURAWALL_AUTH__SSO_AUDIENCE` so a Clerk token minted for another service is refused. The
+token comes from a dedicated short-lived Clerk JWT template that sets that audience.

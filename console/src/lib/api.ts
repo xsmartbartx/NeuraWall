@@ -43,7 +43,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    if (res.status === 401 && !path.startsWith("/auth/login")) onUnauthorized();
+    if (res.status === 401 && !path.startsWith("/auth/login") && !path.startsWith("/auth/sso")) onUnauthorized();
     const detail = Array.isArray(data.details) && data.details.length
       ? `: ${data.details.map((d: { loc: string[]; msg: string }) => `${d.loc.join(".")} ${d.msg}`).join("; ")}`
       : "";
