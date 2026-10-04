@@ -136,3 +136,36 @@ def test_organisation_can_be_required(tmp_path):
 def test_the_password_login_is_unchanged(client):
     r = client.post("/api/v1/auth/login", json={"email": ADMIN[0], "password": ADMIN[1]})
     assert r.status_code == 200
+
+
+def test_audience_is_enforced_when_configured(tmp_path):
+    with build_client(
+        tmp_path, sso_jwks_url=JWKS, sso_issuer=ISSUER, sso_audience="neurawall"
+    ) as c:
+        assert sso_login(c, make_token(email=ADMIN[0])).status_code == 403
+        assert sso_login(c, make_token(email=ADMIN[0], aud="something-else")).status_code == 403
+        assert sso_login(c, make_token(email=ADMIN[0], aud="neurawall")).status_code == 200
+
+
+def test_sso_config_is_off_by_default_and_public(tmp_path):
+    with build_client(tmp_path) as c:
+        r = c.get("/api/v1/auth/sso/config")
+        assert r.status_code == 200
+        assert r.json() == {"enabled": False, "login_url": None}
+
+
+def test_sso_config_needs_both_the_verifier_and_a_login_url(tmp_path):
+    only_verifier = build_client(tmp_path / "a", sso_jwks_url=JWKS)
+    only_url = build_client(tmp_path / "b", sso_login_url="https://account.test/sso/neurawall")
+    both = build_client(
+        tmp_path / "c", sso_jwks_url=JWKS, sso_login_url="https://account.test/sso/neurawall"
+    )
+    with only_verifier as c:
+        assert c.get("/api/v1/auth/sso/config").json()["enabled"] is False
+    with only_url as c:
+        assert c.get("/api/v1/auth/sso/config").json()["enabled"] is False
+    with both as c:
+        assert c.get("/api/v1/auth/sso/config").json() == {
+            "enabled": True,
+            "login_url": "https://account.test/sso/neurawall",
+        }

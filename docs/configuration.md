@@ -72,6 +72,8 @@ Configuration is layered: **defaults → YAML file → environment → runtime o
 | `auth.login_rate_per_minute` | `NEURAWALL_AUTH__LOGIN_RATE_PER_MINUTE` | int | `10` | Login attempts allowed per minute per client IP and per account. |
 | `auth.sso_jwks_url` | `NEURAWALL_AUTH__SSO_JWKS_URL` | str \| None | — | Clerk JWKS URL (e.g. `https://clerk.example.com/.well-known/jwks.json`). Setting it enables `POST /api/v1/auth/sso`, which signs an *existing* user in from a verified Clerk session token. Unset (the default) = SSO is off and the endpoint returns 404. |
 | `auth.sso_issuer` | `NEURAWALL_AUTH__SSO_ISSUER` | str \| None | — | If set, the token's `iss` claim must equal this (the Clerk frontend API URL). |
+| `auth.sso_audience` | `NEURAWALL_AUTH__SSO_AUDIENCE` | str \| None | — | If set, the token's `aud` claim must equal this (the Clerk JWT template should set it), so a Clerk token minted for another service cannot be replayed here. |
+| `auth.sso_login_url` | `NEURAWALL_AUTH__SSO_LOGIN_URL` | str \| None | — | Where the console sends the browser to obtain a token (the NEXORA account app's handoff URL). Setting it shows "Sign in with NEXORA" on the console login page. |
 | `auth.sso_required_org_id` | `NEURAWALL_AUTH__SSO_REQUIRED_ORG_ID` | str \| None | — | If set, the token must carry this Clerk organisation id (`org_id`), so only members of one organisation can use SSO. |
 
 ## `billing`

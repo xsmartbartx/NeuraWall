@@ -1,14 +1,28 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Logo } from "../components/Layout";
 import { api, setToken } from "../lib/api";
 import { useAuth } from "../lib/hooks";
+import { consumeSsoFragment, startSso, type SsoConfig } from "../lib/sso";
 
 export function Login() {
-  const { login } = useAuth();
+  const { login, loginWithSso } = useAuth();
+  const [sso, setSso] = useState<SsoConfig | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    // Returning from the account app with a token in the fragment: finish the sign-in.
+    const token = consumeSsoFragment();
+    if (token) {
+      setBusy(true);
+      loginWithSso(token)
+        .catch(() => setError("Single sign-on was not accepted for this account. Use your password instead."))
+        .finally(() => setBusy(false));
+    }
+    api<SsoConfig>("/auth/sso/config").then(setSso).catch(() => setSso(null));
+  }, [loginWithSso]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -31,6 +45,12 @@ export function Login() {
         <button className="primary" disabled={busy} type="submit" style={{ justifyContent: "center" }}>
           {busy ? <span className="spinner" /> : "Sign in"}
         </button>
+        {sso?.enabled && sso.login_url && (
+          <button type="button" className="ghost" disabled={busy} style={{ justifyContent: "center" }}
+            onClick={() => { try { startSso(sso.login_url!); } catch (err) { setError((err as Error).message); } }}>
+            Sign in with NEXORA
+          </button>
+        )}
         <p className="faint" style={{ margin: 0, fontSize: 12 }}>
           First login? The bootstrap admin password is in <code>initial-admin-password.txt</code> in the server's data directory.
         </p>
