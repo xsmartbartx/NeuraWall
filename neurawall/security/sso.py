@@ -46,6 +46,8 @@ def verify_sso_token(
     return the identity. Every failure is the same generic `PolicyViolation` so
     a caller cannot tell which check rejected the token."""
     denied = PolicyViolation("single sign-on was not accepted")
+    # An env var set to the empty string means "not configured", not "must equal ''".
+    issuer, audience, required_org_id = issuer or None, audience or None, required_org_id or None
     try:
         key = (
             get_signing_key(token)

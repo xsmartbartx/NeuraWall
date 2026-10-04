@@ -169,3 +169,17 @@ def test_sso_config_needs_both_the_verifier_and_a_login_url(tmp_path):
             "enabled": True,
             "login_url": "https://account.test/sso/neurawall",
         }
+
+
+def test_empty_settings_mean_not_configured(tmp_path):
+    """Compose passes unset variables through as empty strings."""
+    with build_client(
+        tmp_path,
+        sso_jwks_url=JWKS,
+        sso_issuer="",
+        sso_audience="",
+        sso_required_org_id="",
+        sso_login_url="",
+    ) as c:
+        assert sso_login(c, make_token(email=ADMIN[0])).status_code == 200
+        assert c.get("/api/v1/auth/sso/config").json()["enabled"] is False
