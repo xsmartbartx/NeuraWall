@@ -142,6 +142,23 @@ export interface Dashboard {
   active_rules: number; bundle_version: number; advisor_mode: string; tier1_trained: boolean;
 }
 
+export interface CustomerSummary {
+  health_score: number;
+  open_alerts: number;
+  critical_alerts: number;
+  fleet_coverage: number;
+  pending_approvals: number;
+  active_rules: number;
+  bundle_version: number;
+  advisor_mode: string;
+  tier1_trained: boolean;
+  plan_name: string;
+  nodes_used: number;
+  nodes_limit: number | null;
+  retention_days: number | null;
+  llm_advisor_allowed: boolean;
+}
+
 export interface SystemInfo {
   version: string; environment: string; hostname: string; uptime_seconds: number;
   advisor: { mode: string; provider: string; model: string | null; budget_remaining: number; last_error: string | null };
