@@ -11,7 +11,8 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import func, or_, select
 
 from neurawall import __version__
-from neurawall.core.errors import NotFound, PolicyViolation
+from neurawall.core.errors import IntegrityFailure, NotFound, PolicyViolation
+from neurawall.core.logging import get_logger
 from neurawall.core.models import (
     Action,
     DraftSource,
@@ -71,6 +72,8 @@ def readyz(cp: CP) -> dict[str, Any]:
 def metrics() -> str:
     return REGISTRY.expose()
 
+
+log = get_logger(__name__)
 
 api = APIRouter(prefix="/api/v1")
 
@@ -529,8 +532,12 @@ def list_audit(
 def verify_audit(cp: CP, _: Auditor) -> dict[str, Any]:
     try:
         return {"valid": True, "entries": cp.verify_audit()}
-    except Exception as exc:  # IntegrityFailure -> report, do not 500
-        return {"valid": False, "error": str(exc)}
+    except IntegrityFailure as exc:  # report, do not 500; the sequence number goes to the log
+        log.warning("audit chain failed verification", detail=str(exc))
+        return {"valid": False, "error": "The audit chain failed verification. See the server log."}
+    except Exception:  # never echo internals to the caller
+        log.exception("audit verification could not run")
+        return {"valid": False, "error": "Audit verification could not be completed."}
 
 
 # ---------------------------------------------------------------- node agent endpoints
@@ -592,12 +599,14 @@ def get_bundle(cp: CP, node: NodeAuth) -> dict[str, Any]:
 @agent.post("/flows")
 def ingest_flows(body: FlowBatchIn, cp: CP, node: NodeAuth) -> dict[str, Any]:
     parsed = parse_flows(body.flows, node_id=node.id)
+    if parsed.errors:
+        log.warning("flow records rejected", node=node.id, details=parsed.errors)
     outcome = cp.ingest(node.id, parsed.flows, node_version=body.applied_version or None)
     by_id = {f.flow_id: f for f in parsed.flows}
     return {
         "accepted": outcome.accepted,
         "rejected": parsed.rejected,
-        "errors": parsed.errors,
+        "errors": [f"record {i}: not a valid flow record" for i in parsed.error_records],
         "bundle_version": outcome.bundle_version,
         "verdicts": [
             {

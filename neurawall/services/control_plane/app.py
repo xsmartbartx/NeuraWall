@@ -186,7 +186,10 @@ def _mount_console(app: FastAPI) -> None:
     def spa(path: str) -> Response:
         if path.startswith(("api/", "healthz", "readyz", "metrics")):
             return JSONResponse({"error": "not_found"}, status_code=404)
-        candidate = (STATIC_DIR / path).resolve()
-        if path and candidate.is_file() and STATIC_DIR.resolve() in candidate.parents:
+        try:
+            candidate = (STATIC_DIR / path).resolve()
+        except (ValueError, OSError):  # e.g. an embedded NUL byte: not a file, not a 500
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        if path and STATIC_DIR.resolve() in candidate.parents and candidate.is_file():
             return FileResponse(candidate)
         return FileResponse(index, headers={"Cache-Control": "no-cache"})
