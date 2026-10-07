@@ -43,6 +43,8 @@ class IngestResult:
     flows: list[FlowRecord] = field(default_factory=list)
     rejected: int = 0
     errors: list[str] = field(default_factory=list)
+    #: Indexes (capped, like ``errors``) of rejected records, safe to return to a caller.
+    error_records: list[int] = field(default_factory=list)
 
 
 def parse_flows(items: Iterable[Any], *, node_id: str | None = None) -> IngestResult:
@@ -58,6 +60,7 @@ def parse_flows(items: Iterable[Any], *, node_id: str | None = None) -> IngestRe
             res.rejected += 1
             if len(res.errors) < 5:
                 res.errors.append(f"record {i}: {str(exc).splitlines()[0][:200]}")
+                res.error_records.append(i)
     _accepted.inc(len(res.flows))
     _malformed.inc(res.rejected)
     return res
