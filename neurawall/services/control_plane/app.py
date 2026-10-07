@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -186,10 +187,11 @@ def _mount_console(app: FastAPI) -> None:
     def spa(path: str) -> Response:
         if path.startswith(("api/", "healthz", "readyz", "metrics")):
             return JSONResponse({"error": "not_found"}, status_code=404)
+        root = os.path.realpath(STATIC_DIR)
         try:
-            candidate = (STATIC_DIR / path).resolve()
+            full = os.path.realpath(os.path.join(root, path))
         except (ValueError, OSError):  # e.g. an embedded NUL byte: not a file, not a 500
             return JSONResponse({"error": "not_found"}, status_code=404)
-        if path and STATIC_DIR.resolve() in candidate.parents and candidate.is_file():
-            return FileResponse(candidate)
+        if path and full.startswith(root + os.sep) and os.path.isfile(full):
+            return FileResponse(full)
         return FileResponse(index, headers={"Cache-Control": "no-cache"})
