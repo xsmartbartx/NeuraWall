@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BarList, VerdictTimeline } from "../components/charts";
-import { Badge, Card, ErrorBox, Kpi, Labels, Loading, PageHead, Meter } from "../components/ui";
+import { Badge, Card, ErrorBox, Kpi, Loading, PageHead, Meter } from "../components/ui";
 import type { Alert, Dashboard, Page } from "../lib/api";
 import { ago, num, pct } from "../lib/format";
 import { useApi, useAuth } from "../lib/hooks";
