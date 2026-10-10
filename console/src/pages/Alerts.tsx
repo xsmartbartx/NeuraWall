@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Badge, Card, Drawer, Empty, ErrorBox, Labels, Loading, PageHead, Pager } from "../components/ui";
+import { ExportButton } from "../components/controls";
 import { api, type Alert, type FlowSummary, type Page } from "../lib/api";
 import { ago, dateTime, human } from "../lib/format";
 import { useAction, useApi, useAuth } from "../lib/hooks";
@@ -22,7 +23,8 @@ export function Alerts() {
 
   return (
     <>
-      <PageHead title="Alerts" desc="Related suspicious flows grouped by source and rule or label. Tier 3 triages high-severity and ambiguous alerts automatically." />
+      <PageHead title="Alerts" desc="Related suspicious flows grouped by source and rule or label. Tier 3 triages high-severity and ambiguous alerts automatically."
+        actions={<ExportButton path={`/alerts/export.csv?${new URLSearchParams([...qs].filter(([k]) => k === "status" || k === "severity"))}`} filename="alerts.csv" />} />
       <Card pad={false} title={
         <div className="row">
           <select value={status} onChange={(e) => { setStatus(e.target.value); setOffset(0); }} aria-label="Status">

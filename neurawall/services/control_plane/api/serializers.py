@@ -19,6 +19,7 @@ def user(u: db.User) -> dict[str, Any]:
         "must_change_password": u.must_change_password,
         "created_at": u.created_at,
         "last_login": u.last_login,
+        "auth_provider": u.auth_provider,
     }
 
 

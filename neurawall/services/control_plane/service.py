@@ -9,16 +9,21 @@
 from __future__ import annotations
 
 import queue
+import random
 import secrets
 import socket
 import threading
 import time
-from collections import Counter
+import uuid
+from collections import Counter, deque
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from neurawall import __version__
@@ -56,8 +61,10 @@ from neurawall.modules.billing import (
 )
 from neurawall.modules.flow_collector.generator import TrafficGenerator
 from neurawall.modules.l7_classifier import L7Classifier, needs_tier3
-from neurawall.modules.llm_advisor import ClaudeBackend, LlmAdvisor
+from neurawall.modules.llm_advisor import CallRecord, ClaudeBackend, LlmAdvisor
 from neurawall.modules.llm_advisor.advisor import Backend
+from neurawall.modules.nexora import NexoraClient, NexoraError
+from neurawall.modules.notify import WebhookError, check_url, derive_secret, send_webhook
 from neurawall.modules.policy_engine import (
     PolicyEngine,
     RolloutState,
@@ -77,6 +84,7 @@ from neurawall.security.credentials import (
 )
 from neurawall.security.integrity import FileSigner, Signer
 from neurawall.security.rbac import Role, enforce_four_eyes
+from neurawall.security.sso import SsoIdentity
 from neurawall.services.control_plane import db
 from neurawall.services.control_plane.starter import starter_rules
 
@@ -129,8 +137,20 @@ class ControlPlane:
             self._make_backend(advisor_backend),
             max_calls_per_hour=settings.llm.max_calls_per_hour,
             allowed=lambda: self.plan().llm_advisor_allowed,
+            within_budget=self._llm_within_budget,
+            on_call=self._record_llm_call,
         )
         self._engines: dict[int, PolicyEngine] = {}
+        self._nexora_lock = threading.Lock()
+        self._notify_queue: deque[tuple[str, str, float, dict[str, Any]]] = deque(maxlen=5_000)
+        self._test_sends: list[float] = []
+        self._notify_transport: httpx.BaseTransport | None = None  # tests inject a fake receiver
+        self._resolver: Any = None  # tests inject a fake DNS; None = the system resolver
+        self._events: deque[tuple[str, float, dict[str, Any]]] = deque(maxlen=10_000)
+        self._flows_since_rollup = 0
+        self._last_rollup = time.time()
+        self._manual_syncs: list[float] = []
+        self._nexora_transport: httpx.BaseTransport | None = None  # tests inject a fake NEXORA
         self._audit_lock = threading.Lock()
         self._publish_lock = threading.Lock()
         self._ingest_lock = threading.Lock()
@@ -225,6 +245,15 @@ class ControlPlane:
         ]
         if self.settings.demo_mode:
             self._threads.append(threading.Thread(target=self._demo_loop, name="demo", daemon=True))
+        self._threads.append(threading.Thread(target=self._notify_loop, name="notify", daemon=True))
+        if self.linked:
+            self._threads.append(
+                threading.Thread(target=self._nexora_loop, name="nexora-sync", daemon=True)
+            )
+            if self.settings.nexora.events_enabled:
+                self._threads.append(
+                    threading.Thread(target=self._outbox_loop, name="outbox", daemon=True)
+                )
         for t in self._threads:
             t.start()
 
@@ -246,6 +275,28 @@ class ControlPlane:
                 prev=prev, ts=time.time(), actor=actor, action=action, target=target, detail=detail
             )
             s.add(db.AuditRow(**e.model_dump()))
+        self._emit_for_audit(action, target, detail or {})
+        if action == "draft.create" and target.startswith("draft:"):
+            self._notify("draft.pending", target[6:], {"draft_id": target[6:], "by": actor})
+
+    #: Audit actions that are also usage events, and the only fields that leave the host.
+    _EVENT_FOR_AUDIT: dict[str, tuple[str, tuple[str, ...]]] = {
+        "node.enroll": ("neurawall.node.enrolled", ()),
+        "node.revoke": ("neurawall.node.revoked", ()),
+        "draft.approve": ("neurawall.rule.approved", ("mode",)),
+        "bundle.publish": ("neurawall.bundle.published", ("rules",)),
+        "bundle.rollback": ("neurawall.bundle.rolled_back", ()),
+    }
+
+    def _emit_for_audit(self, action: str, target: str, detail: dict[str, Any]) -> None:
+        spec = self._EVENT_FOR_AUDIT.get(action)
+        if spec is None:
+            return
+        event_type, fields = spec
+        data = {k: detail[k] for k in fields if isinstance(detail.get(k), str | int)}
+        if action.startswith("bundle.") and target.startswith("bundle:v"):
+            data["version"] = int(target[8:]) if target[8:].isdigit() else 0
+        self._emit(event_type, data)
 
     def verify_audit(self) -> int:
         with self.db.session() as s:
@@ -257,10 +308,14 @@ class ControlPlane:
     def login(self, email: str, password: str) -> tuple[str, db.User]:
         with self.db.session() as s:
             user = s.scalars(select(db.User).where(db.User.email == email.lower().strip())).first()
-            if user is None or not user.active or not verify_password(password, user.password_hash):
+            if user is None:
                 # Constant-ish work either way to limit user enumeration by timing.
-                if user is None:
-                    verify_password(password, "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHQ$aGFzaA")
+                verify_password(password, "$argon2id$v=19$m=65536,t=3,p=4$c2FsdHNhbHQ$aGFzaA")
+                raise PolicyViolation("invalid email or password")
+            # `admin_only` keeps password sign-in for break-glass admins. It is the same error,
+            # so a refusal does not reveal which rule applied.
+            allowed = self.settings.auth.local_login == "enabled" or user.role == Role.ADMIN.value
+            if not (user.active and verify_password(password, user.password_hash) and allowed):
                 raise PolicyViolation("invalid email or password")
             user.last_login = time.time()
             token = issue_token(
@@ -269,26 +324,97 @@ class ControlPlane:
                 secret=self.settings.jwt_secret,
                 ttl_seconds=self.settings.auth.access_token_ttl_seconds,
             )
+            s.flush()  # expunge() would drop the pending last_login update
             s.expunge(user)
         self.audit(user.email, "auth.login", f"user:{user.id}")
         return token, user
 
-    def login_sso(self, email: str) -> tuple[str, db.User]:
-        """Sign in an *existing, active* user whose email Clerk has verified.
-        No user is created and no role is taken from the identity provider."""
+    def login_sso(self, identity: SsoIdentity) -> tuple[str, db.User]:
+        """Sign in from a verified identity-provider token.
+
+        Match order: the provider's user id, then (once) an existing user with the same email,
+        which is linked to that id. With `auth.sso_jit` an unknown member of the required
+        organisation gets a `viewer`. A role is never taken from the token."""
+        auth = self.settings.auth
+        denied = PolicyViolation("single sign-on was not accepted")
+        provisioned = False
         with self.db.session() as s:
-            user = s.scalars(select(db.User).where(db.User.email == email.lower().strip())).first()
-            if user is None or not user.active:
-                raise PolicyViolation("single sign-on was not accepted")
+            user = s.scalars(select(db.User).where(db.User.external_id == identity.subject)).first()
+            if user is None:
+                user = s.scalars(select(db.User).where(db.User.email == identity.email)).first()
+                if user is not None:
+                    if user.external_id is not None:
+                        raise denied  # that email belongs to a different provider identity
+                    if auth.sso_jit and not identity.email_verified:
+                        raise denied  # strict mode: an unverified email proves nothing
+                    # Bind the provider id only when the email is verified. A token that does
+                    # not say so still signs in as before (the identity provider is required
+                    # to verify emails) but cannot claim the account for its own subject.
+                    if identity.email_verified:
+                        user.external_id = identity.subject
+                elif auth.sso_jit and identity.email_verified and identity.org_id:
+                    user = db.User(
+                        email=identity.email,
+                        name=identity.name or identity.email.split("@")[0],
+                        role=Role.VIEWER.value,
+                        # Nobody knows this password: it is random and never shown.
+                        password_hash=hash_password(secrets.token_urlsafe(48) + "aA1!"),
+                        external_id=identity.subject,
+                        auth_provider="nexora",
+                    )
+                    s.add(user)
+                    try:
+                        s.flush()
+                    except IntegrityError:
+                        # A second sign-in for the same identity won the race; they retry.
+                        raise denied from None
+                    provisioned = True
+                else:
+                    raise denied
+            if not user.active:
+                raise denied
             user.last_login = time.time()
             token = issue_token(
                 subject=str(user.id),
                 role=user.role,
                 secret=self.settings.jwt_secret,
-                ttl_seconds=self.settings.auth.access_token_ttl_seconds,
+                ttl_seconds=auth.sso_ttl_seconds,
+            )
+            s.flush()  # expunge() would drop the pending last_login / external_id update
+            s.expunge(user)
+        if provisioned:
+            self.audit(user.email, "auth.sso.provision", f"user:{user.id}", {"role": user.role})
+        self.audit(user.email, "auth.login.sso", f"user:{user.id}")
+        return token, user
+
+    DEMO_EMAIL = "demo@neurawall.local"
+    DEMO_SESSION_SECONDS = 1800
+
+    def login_demo(self) -> tuple[str, db.User]:
+        """A read-only viewer session on a demo instance (see `auth.demo_public_login`)."""
+        if not (self.settings.auth.demo_public_login and self.settings.demo_mode):
+            raise NotFound("the public demo is not enabled")
+        with self.db.session() as s:
+            user = s.scalars(select(db.User).where(db.User.email == self.DEMO_EMAIL)).first()
+            if user is None:
+                user = db.User(
+                    email=self.DEMO_EMAIL,
+                    name="Demo visitor",
+                    role=Role.VIEWER.value,
+                    password_hash=hash_password(secrets.token_urlsafe(48) + "aA1!"),
+                )
+                s.add(user)
+                s.flush()
+            if user.role != Role.VIEWER.value or not user.active:
+                # An administrator changed the demo account: never hand out a session for it.
+                raise NotFound("the public demo is not enabled")
+            token = issue_token(
+                subject=str(user.id),
+                role=user.role,
+                secret=self.settings.jwt_secret,
+                ttl_seconds=self.DEMO_SESSION_SECONDS,
             )
             s.expunge(user)
-        self.audit(user.email, "auth.login.sso", f"user:{user.id}")
         return token, user
 
     def get_user(self, user_id: int) -> db.User:
@@ -396,6 +522,8 @@ class ControlPlane:
             u = s.get(db.User, user_id)
             if u is None:
                 raise NotFound("user not found")
+            if u.auth_provider != "local":
+                raise ValidationFailure("this account signs in with NEXORA and has no password")
             u.password_hash = hash_password(temp)
             u.must_change_password = True
             u.sessions_valid_after = time.time()
@@ -744,6 +872,7 @@ class ControlPlane:
                 results.append((ev, engine.evaluate(ev)))
         self._persist(node_id, results)
         _ingested.inc(len(flows), node=node_id)
+        self._flows_since_rollup += len(flows)
         blocking = [v for _, v in results if v.enforced]
         return IngestOutcome(len(flows), blocking, engine.version)
 
@@ -832,6 +961,19 @@ class ControlPlane:
             s.add(alert)
             s.flush()
             _alerts_created.inc(severity=sev)
+            self._emit("neurawall.alert.created", {"severity": sev})
+            self._notify(
+                "alert.created",
+                str(alert.id),
+                {
+                    "alert_id": alert.id,
+                    "severity": sev,
+                    "title": alert.title,
+                    "labels": labels,
+                    "src_ip": alert.src_ip,
+                    "dst_ip": alert.dst_ip,
+                },
+            )
             new = True
         else:
             new = False
@@ -1170,9 +1312,17 @@ class ControlPlane:
 
     def active_subscription(self) -> db.Subscription | None:
         cutoff = time.time() - self.BILLING_GRACE_SECONDS
+        # Linked: only what NEXORA says counts. Standalone: only local Stripe subscriptions.
+        # Never both, so a stale row from the other source cannot decide the plan.
+        source = (
+            db.Subscription.provider == "nexora"
+            if self.linked
+            else db.Subscription.provider != "nexora"
+        )
         with self.db.session() as s:
             sub = s.scalars(
                 select(db.Subscription)
+                .where(source)
                 .where(db.Subscription.status == "active")
                 .where(
                     (db.Subscription.current_period_end.is_(None))
@@ -1209,9 +1359,12 @@ class ControlPlane:
                 or 0
             )
         cfg = self.settings.billing
+        cfg_n = self.settings.nexora
         return {
             "plan": _plan_dict(plan),
-            "source": "stripe" if sub else "licence",
+            "source": sub.provider if sub else "licence",
+            "linked": self.linked,
+            "manage_url": f"{cfg_n.console_url}/billing" if self.linked else None,
             "subscription": None
             if sub is None
             else {
@@ -1219,19 +1372,638 @@ class ControlPlane:
                 "current_period_end": sub.current_period_end,
                 "manageable": bool(sub.provider_customer_id),
             },
-            "usage": {"nodes": nodes, "retention_days": self.retention_seconds() // 86400},
-            "self_serve": cfg.self_serve_enabled,
+            "usage": {
+                "nodes": nodes,
+                "retention_days": self.retention_seconds() // 86400,
+                "llm_calls": self.llm_calls_this_period(),
+                "llm_budget": self.llm_budget(),
+            },
+            "self_serve": cfg.self_serve_enabled and not self.linked,
             "plans": [
                 _plan_dict(p)
                 | {
                     "purchasable": {
-                        i: bool(cfg.self_serve_enabled and cfg.price_id(p.plan_id.value, i))
+                        i: bool(
+                            cfg.self_serve_enabled
+                            and not self.linked
+                            and cfg.price_id(p.plan_id.value, i)
+                        )
                         for i in ("month", "year")
                     }
                 }
                 for p in PLANS.values()
             ],
         }
+
+    # ------------------------------------------------------------------ Claude usage
+
+    #: Usage rows are kept this long: the current and the previous month, for the console.
+    LLM_USAGE_KEEP_SECONDS = 62 * 86400
+
+    @staticmethod
+    def _llm_period(now: float | None = None) -> tuple[float, float]:
+        """The UTC calendar month that contains `now`, as (start, end) epoch seconds."""
+        d = datetime.fromtimestamp(now if now is not None else time.time(), UTC)
+        start = datetime(d.year, d.month, 1, tzinfo=UTC)
+        end = datetime(d.year + (d.month == 12), d.month % 12 + 1, 1, tzinfo=UTC)
+        return start.timestamp(), end.timestamp()
+
+    def _record_llm_call(self, rec: CallRecord) -> None:
+        self._emit("neurawall.llm.call", {"kind": rec.kind, "outcome": rec.outcome})
+        with self.db.session() as s:
+            s.add(
+                db.LlmUsage(
+                    kind=rec.kind,
+                    model=rec.model[:60],
+                    input_tokens=rec.input_tokens,
+                    output_tokens=rec.output_tokens,
+                    outcome=rec.outcome,
+                )
+            )
+
+    def llm_budget(self) -> int | None:
+        """Calls per month the plan includes, or None when there is no cap to enforce."""
+        plan = self.plan()
+        if plan.llm_access != "included":
+            return None
+        return self.settings.billing.llm_monthly_calls(plan.plan_id.value)
+
+    def llm_calls_this_period(self) -> int:
+        start, end = self._llm_period()
+        with self.db.session() as s:
+            return int(
+                s.scalar(
+                    select(func.count())
+                    .select_from(db.LlmUsage)
+                    .where(db.LlmUsage.ts >= start, db.LlmUsage.ts < end)
+                    .where(db.LlmUsage.outcome.in_(("ok", "refused")))
+                )
+                or 0
+            )
+
+    def _llm_within_budget(self) -> bool:
+        budget = self.llm_budget()
+        return budget is None or self.llm_calls_this_period() < budget
+
+    def llm_usage(self) -> dict[str, Any]:
+        start, end = self._llm_period()
+        plan = self.plan()
+        with self.db.session() as s:
+            rows = s.execute(
+                select(db.LlmUsage.kind, func.count(), func.sum(db.LlmUsage.output_tokens))
+                .where(db.LlmUsage.ts >= start, db.LlmUsage.ts < end)
+                .group_by(db.LlmUsage.kind)
+            ).all()
+        return {
+            "access": plan.llm_access,
+            "used": self.llm_calls_this_period(),
+            "budget": self.llm_budget(),
+            "period_start": start,
+            "period_end": end,
+            "by_kind": {k: int(n) for k, n, _ in rows},
+            "mode": self.advisor.mode,
+        }
+
+    # ------------------------------------------------------------------ notifications
+
+    NOTIFY_EVENTS = ("alert.created", "draft.pending")
+    NOTIFY_MAX_ATTEMPTS = 6
+    NOTIFY_TESTS_PER_HOUR = 10
+
+    def _notify(self, event_type: str, ref: str, data: dict[str, Any]) -> None:
+        """Queue a notification; like `_emit` it never touches the database."""
+        self._notify_queue.append((event_type, ref, time.time(), data))
+
+    def _channel_secret(self, ch: db.NotificationChannel) -> str:
+        return derive_secret(self.settings.jwt_secret, ch.secret_nonce)
+
+    @staticmethod
+    def _check_channel_url(url: str, resolver: Any) -> None:
+        check_url(url, **({"resolver": resolver} if resolver else {}))
+
+    def list_channels(self) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            channels = s.scalars(
+                select(db.NotificationChannel).order_by(db.NotificationChannel.id)
+            ).all()
+            out = []
+            for ch in channels:
+                last = s.scalars(
+                    select(db.NotificationDelivery)
+                    .where(db.NotificationDelivery.channel_id == ch.id)
+                    .order_by(db.NotificationDelivery.id.desc())
+                    .limit(1)
+                ).first()
+                out.append(
+                    {
+                        "id": ch.id,
+                        "name": ch.name,
+                        # The URL may be a secret (Slack's are): show where it goes, not what it is.
+                        "url_hint": _url_hint(ch.url),
+                        "events": ch.events,
+                        "min_severity": ch.min_severity,
+                        "active": ch.active,
+                        "created_by": ch.created_by,
+                        "created_at": ch.created_at,
+                        "last_delivery": None
+                        if last is None
+                        else {
+                            "status": last.status,
+                            "http_status": last.http_status,
+                            "error": last.error,
+                            "at": last.sent_at or last.created_at,
+                        },
+                    }
+                )
+            return out
+
+    def create_channel(
+        self, actor: str, *, name: str, url: str, events: list[str], min_severity: str
+    ) -> tuple[dict[str, Any], str]:
+        """Returns the channel and its signing secret, which is shown once."""
+        self._check_channel_url(url, self._resolver)
+        nonce = secrets.token_hex(16)
+        with self.db.session() as s:
+            if s.scalars(
+                select(db.NotificationChannel).where(db.NotificationChannel.name == name)
+            ).first():
+                raise ValidationFailure("a channel with this name already exists")
+            ch = db.NotificationChannel(
+                name=name,
+                url=url,
+                secret_nonce=nonce,
+                events=sorted(set(events)),
+                min_severity=min_severity,
+                created_by=actor,
+            )
+            s.add(ch)
+            s.flush()
+            secret = self._channel_secret(ch)
+            channel_id = ch.id
+        self.audit(
+            actor, "notify.channel_create", f"channel:{channel_id}", {"host": _url_hint(url)}
+        )
+        return next(c for c in self.list_channels() if c["id"] == channel_id), secret
+
+    def update_channel(
+        self,
+        actor: str,
+        channel_id: int,
+        *,
+        name: str | None = None,
+        url: str | None = None,
+        events: list[str] | None = None,
+        min_severity: str | None = None,
+        active: bool | None = None,
+        rotate_secret: bool = False,
+    ) -> tuple[dict[str, Any], str | None]:
+        if url is not None:
+            self._check_channel_url(url, self._resolver)
+        secret = None
+        with self.db.session() as s:
+            ch = s.get(db.NotificationChannel, channel_id)
+            if ch is None:
+                raise NotFound("channel not found")
+            if name is not None and name != ch.name:
+                if s.scalars(
+                    select(db.NotificationChannel).where(db.NotificationChannel.name == name)
+                ).first():
+                    raise ValidationFailure("a channel with this name already exists")
+                ch.name = name
+            if url is not None:
+                ch.url = url
+            if events is not None:
+                ch.events = sorted(set(events))
+            if min_severity is not None:
+                ch.min_severity = min_severity
+            if active is not None:
+                ch.active = active
+            if rotate_secret:
+                ch.secret_nonce = secrets.token_hex(16)
+                secret = self._channel_secret(ch)
+        self.audit(
+            actor,
+            "notify.channel_update",
+            f"channel:{channel_id}",
+            {"url_changed": url is not None, "rotated": rotate_secret, "active": active},
+        )
+        return next(c for c in self.list_channels() if c["id"] == channel_id), secret
+
+    def delete_channel(self, actor: str, channel_id: int) -> None:
+        with self.db.session() as s:
+            ch = s.get(db.NotificationChannel, channel_id)
+            if ch is None:
+                raise NotFound("channel not found")
+            s.delete(ch)
+        self.audit(actor, "notify.channel_delete", f"channel:{channel_id}")
+
+    def _payload(
+        self, event_type: str, ref: str, ts: float, data: dict[str, Any]
+    ) -> dict[str, Any]:
+        base = self.settings.public_url.rstrip("/")
+        if event_type == "alert.created":
+            link, text = (
+                f"{base}/alerts/{ref}",
+                (f"NeuraWall {data.get('severity', '')} alert: {data.get('title', '')}"),
+            )
+        else:
+            link, text = (
+                f"{base}/approvals/{ref}",
+                "NeuraWall: a rule draft is waiting for approval",
+            )
+        # `text` makes the same body work with Slack and Teams incoming webhooks.
+        return {"event": event_type, "ts": ts, "text": f"{text} {link}", "link": link, "data": data}
+
+    def test_channel(self, actor: str, channel_id: int) -> dict[str, Any]:
+        now = time.time()
+        self._test_sends = [t for t in self._test_sends if t > now - 3600]
+        if len(self._test_sends) >= self.NOTIFY_TESTS_PER_HOUR:
+            raise PolicyViolation("test messages were requested too often; try again later")
+        self._test_sends.append(now)
+        with self.db.session() as s:
+            ch = s.get(db.NotificationChannel, channel_id)
+            if ch is None:
+                raise NotFound("channel not found")
+            url, secret = ch.url, self._channel_secret(ch)
+        payload = self._payload("test", "test", now, {"message": "This is a test from NeuraWall."})
+        payload["text"] = "NeuraWall test message: the webhook is working."
+        try:
+            status = send_webhook(
+                url,
+                secret,
+                payload,
+                now=now,
+                **self._send_kwargs(),
+            )
+            result: dict[str, Any] = {"ok": True, "status": status, "error": None}
+        except (WebhookError, ValidationFailure) as exc:
+            result = {"ok": False, "status": None, "error": exc.message}
+        self.audit(actor, "notify.channel_test", f"channel:{channel_id}", {"ok": result["ok"]})
+        return result
+
+    def _send_kwargs(self) -> dict[str, Any]:
+        kw: dict[str, Any] = {"transport": self._notify_transport}
+        if self._resolver:
+            kw["resolver"] = self._resolver
+        return kw
+
+    def list_deliveries(
+        self, channel_id: int | None = None, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        with self.db.session() as s:
+            q = select(db.NotificationDelivery).order_by(db.NotificationDelivery.id.desc())
+            if channel_id is not None:
+                q = q.where(db.NotificationDelivery.channel_id == channel_id)
+            return [
+                {
+                    "id": d.id,
+                    "channel_id": d.channel_id,
+                    "event_type": d.event_type,
+                    "ref": d.ref,
+                    "status": d.status,
+                    "attempts": d.attempts,
+                    "http_status": d.http_status,
+                    "error": d.error,
+                    "created_at": d.created_at,
+                    "sent_at": d.sent_at,
+                }
+                for d in s.scalars(q.limit(limit)).all()
+            ]
+
+    def dispatch_notifications(self) -> int:
+        """Turn queued events into deliveries (once per channel and event) and send what is due.
+        Returns the number delivered. A failure only reschedules, with backoff; after
+        `NOTIFY_MAX_ATTEMPTS` the delivery is marked dead and left for the console to show."""
+        batch = []
+        while self._notify_queue:
+            batch.append(self._notify_queue.popleft())
+        now = time.time()
+        with self.db.session() as s:
+            channels = list(
+                s.scalars(
+                    select(db.NotificationChannel).where(db.NotificationChannel.active.is_(True))
+                ).all()
+            )
+            for event_type, ref, ts, data in batch:
+                for ch in channels:
+                    if event_type not in ch.events:
+                        continue
+                    sev = data.get("severity")
+                    if sev and SEVERITY_ORDER.get(sev, 0) < SEVERITY_ORDER[ch.min_severity]:
+                        continue
+                    exists = s.scalars(
+                        select(db.NotificationDelivery.id).where(
+                            db.NotificationDelivery.channel_id == ch.id,
+                            db.NotificationDelivery.event_type == event_type,
+                            db.NotificationDelivery.ref == ref,
+                        )
+                    ).first()
+                    if exists is None:
+                        s.add(
+                            db.NotificationDelivery(
+                                channel_id=ch.id,
+                                event_type=event_type,
+                                ref=ref,
+                                payload=self._payload(event_type, ref, ts, data),
+                                next_try_at=ts,
+                            )
+                        )
+        with self.db.session() as s:
+            due = [
+                (d.id, d.channel_id, d.payload, d.attempts)
+                for d in s.scalars(
+                    select(db.NotificationDelivery)
+                    .where(
+                        db.NotificationDelivery.status == "pending",
+                        db.NotificationDelivery.next_try_at <= now,
+                    )
+                    .order_by(db.NotificationDelivery.id)
+                    .limit(50)
+                ).all()
+            ]
+        delivered = 0
+        for delivery_id, channel_id, payload, attempts in due:
+            with self.db.session() as s:
+                channel = s.get(db.NotificationChannel, channel_id)
+                if channel is None or not channel.active:
+                    continue
+                url, secret = channel.url, self._channel_secret(channel)
+            status: int | None = None
+            error: str | None = None
+            dead = False
+            try:
+                status = send_webhook(url, secret, payload, now=time.time(), **self._send_kwargs())
+            except ValidationFailure as exc:
+                error, dead = exc.message[:200], True  # the address is not allowed: do not retry
+            except WebhookError as exc:
+                error = exc.message[:200]
+            with self.db.session() as s:
+                row = s.get(db.NotificationDelivery, delivery_id)
+                if row is None:
+                    continue
+                row.attempts = attempts + 1
+                row.http_status = status
+                row.error = error
+                if error is None:
+                    row.status, row.sent_at = "sent", time.time()
+                    delivered += 1
+                elif dead or row.attempts >= self.NOTIFY_MAX_ATTEMPTS:
+                    row.status = "dead"
+                else:
+                    row.next_try_at = time.time() + min(3600, 30 * 2**row.attempts)
+        return delivered
+
+    def _notify_loop(self) -> None:
+        while not self._stop.wait(5):
+            try:
+                self.dispatch_notifications()
+            except Exception:
+                log.exception("notification pass failed")
+
+    # ------------------------------------------------------------------ events to NEXORA
+
+    #: Unsent events kept during a long NEXORA outage; the oldest are dropped beyond this.
+    OUTBOX_MAX_UNSENT = 50_000
+    OUTBOX_BATCH = 100
+
+    def _emit(self, event_type: str, data: dict[str, Any]) -> None:
+        """Queue a usage event (linked installations only). Never touches the database, so it
+        is safe inside any session or lock; the outbox thread persists and sends it."""
+        cfg = self.settings.nexora
+        if cfg.linked and cfg.events_enabled:
+            self._events.append((event_type, time.time(), data))
+
+    def _drain_events(self) -> None:
+        now = time.time()
+        if now - self._last_rollup >= 3600:
+            count, self._flows_since_rollup, self._last_rollup = self._flows_since_rollup, 0, now
+            if count:
+                self._events.append(("neurawall.flows.ingested", now, {"count": count}))
+        batch = []
+        while self._events:
+            batch.append(self._events.popleft())
+        if not batch:
+            return
+        with self.db.session() as s:
+            for event_type, ts, data in batch:
+                s.add(
+                    db.CoreOutbox(
+                        event_id=str(uuid.uuid4()),
+                        event_type=event_type,
+                        payload=data,
+                        created_at=ts,
+                        next_try_at=ts,
+                    )
+                )
+
+    def flush_outbox(self) -> int:
+        """Persist queued events and send what is due. Returns how many NEXORA accepted.
+        A failure only reschedules (exponential backoff, at most an hour apart)."""
+        self._drain_events()
+        now = time.time()
+        with self.db.session() as s:
+            due = list(
+                s.scalars(
+                    select(db.CoreOutbox)
+                    .where(db.CoreOutbox.sent_at.is_(None), db.CoreOutbox.next_try_at <= now)
+                    .order_by(db.CoreOutbox.id)
+                    .limit(self.OUTBOX_BATCH)
+                ).all()
+            )
+            events = [
+                {
+                    "event_id": r.event_id,
+                    "type": r.event_type,
+                    "ts": r.created_at,
+                    "data": r.payload,
+                }
+                for r in due
+            ]
+            ids = [r.id for r in due]
+        if not events:
+            return 0
+        error: str | None = None
+        try:
+            self._nexora_client().post_events(events)
+        except NexoraError as exc:
+            error = str(exc)[:200]
+        with self.db.session() as s:
+            for row in s.scalars(select(db.CoreOutbox).where(db.CoreOutbox.id.in_(ids))).all():
+                if error is None:
+                    row.sent_at = now
+                    row.last_error = None
+                else:
+                    row.attempts += 1
+                    row.last_error = error
+                    row.next_try_at = now + min(3600, 30 * 2 ** min(row.attempts, 7))
+        return len(events) if error is None else 0
+
+    def purge_outbox(self) -> None:
+        now = time.time()
+        with self.db.session() as s:
+            s.execute(
+                delete(db.CoreOutbox).where(
+                    db.CoreOutbox.sent_at.is_not(None), db.CoreOutbox.sent_at < now - 7 * 86400
+                )
+            )
+            unsent = s.scalar(
+                select(func.count())
+                .select_from(db.CoreOutbox)
+                .where(db.CoreOutbox.sent_at.is_(None))
+            )
+            if unsent and unsent > self.OUTBOX_MAX_UNSENT:
+                cutoff = s.scalar(
+                    select(db.CoreOutbox.id)
+                    .where(db.CoreOutbox.sent_at.is_(None))
+                    .order_by(db.CoreOutbox.id.desc())
+                    .offset(self.OUTBOX_MAX_UNSENT)
+                    .limit(1)
+                )
+                if cutoff is not None:
+                    s.execute(
+                        delete(db.CoreOutbox).where(
+                            db.CoreOutbox.sent_at.is_(None), db.CoreOutbox.id <= cutoff
+                        )
+                    )
+
+    def outbox_depth(self) -> int:
+        with self.db.session() as s:
+            return int(
+                s.scalar(
+                    select(func.count())
+                    .select_from(db.CoreOutbox)
+                    .where(db.CoreOutbox.sent_at.is_(None))
+                )
+                or 0
+            ) + len(self._events)
+
+    def _outbox_loop(self) -> None:
+        while not self._stop.wait(15):
+            try:
+                self.flush_outbox()
+            except Exception:
+                log.exception("event outbox pass failed")
+
+    # ------------------------------------------------------------------ NEXORA link
+
+    #: A successful sync keeps the plan valid this long; the billing grace period comes on top.
+    #: If NEXORA stays unreachable the plan lapses to Community instead of lasting forever.
+    NEXORA_VALID_SECONDS = 4 * 86400
+    #: Manual "sync now" presses allowed per hour.
+    NEXORA_MANUAL_SYNCS_PER_HOUR = 6
+
+    @property
+    def linked(self) -> bool:
+        return self.settings.nexora.linked
+
+    def _not_linked(self) -> None:
+        if self.linked:
+            raise PolicyViolation("billing for this installation is managed in NEXORA")
+
+    def _nexora_client(self) -> NexoraClient:
+        cfg = self.settings.nexora
+        if cfg.api_key is None:
+            raise NexoraError("this installation is not linked to NEXORA")
+        return NexoraClient(
+            cfg.api_url, cfg.api_key.get_secret_value(), transport=self._nexora_transport
+        )
+
+    def _get_setting(self, key: str) -> Any:
+        with self.db.session() as s:
+            row = s.get(db.Setting, key)
+            return row.value if row else None
+
+    def _put_setting(self, key: str, value: Any) -> None:
+        with self.db.session() as s:
+            row = s.get(db.Setting, key)
+            if row is None:
+                s.add(db.Setting(key=key, value=value))
+            else:
+                row.value = value
+
+    def sync_nexora(self, actor: str = "system") -> dict[str, Any]:
+        """Pull the organisation's plan from NEXORA and store it as the active subscription.
+
+        Never raises for a NEXORA outage: the failure is recorded and the last good plan keeps
+        applying until it expires. Enforcement is unaffected by any outcome here."""
+        with self._nexora_lock:
+            now = time.time()
+            state: dict[str, Any] = dict(self._get_setting("nexora.sync") or {})
+            state["last_try"] = now
+            try:
+                ent = self._nexora_client().fetch_entitlement()
+                bound = self.settings.auth.sso_required_org_id
+                if bound and ent.org_id != bound:
+                    raise NexoraError("the API key belongs to a different organisation")
+                plan = entitlements(ent.plan_id)
+                valid_until = now + self.NEXORA_VALID_SECONDS
+                if ent.current_period_end:
+                    valid_until = min(valid_until, float(ent.current_period_end))
+                sub_id = f"nexora:{ent.org_id}:neurawall"
+                with self.db.session() as s:
+                    sub = s.scalars(
+                        select(db.Subscription).where(
+                            db.Subscription.provider_subscription_id == sub_id
+                        )
+                    ).first()
+                    if sub is None:
+                        sub = db.Subscription(provider="nexora", provider_subscription_id=sub_id)
+                        s.add(sub)
+                    before = sub.plan_id
+                    sub.plan_id = plan.plan_id.value
+                    sub.status = "active"
+                    sub.current_period_end = valid_until
+                    sub.updated_at = now
+                if before != plan.plan_id.value:
+                    self.audit(
+                        actor,
+                        "billing.nexora_plan_changed",
+                        f"org:{ent.org_id}",
+                        {"from": before, "to": plan.plan_id.value},
+                    )
+                state.update(last_ok=now, error=None, org_id=ent.org_id, plan_id=plan.plan_id.value)
+            except NexoraError as exc:
+                state["error"] = str(exc)
+                log.warning("NEXORA sync failed", error=str(exc))
+            self._put_setting("nexora.sync", state)
+        return self.nexora_status()
+
+    def sync_nexora_manually(self, actor: str) -> dict[str, Any]:
+        now = time.time()
+        self._manual_syncs = [t for t in self._manual_syncs if t > now - 3600]
+        if len(self._manual_syncs) >= self.NEXORA_MANUAL_SYNCS_PER_HOUR:
+            raise PolicyViolation("sync was requested too often; try again later")
+        self._manual_syncs.append(now)
+        return self.sync_nexora(actor)
+
+    def nexora_status(self) -> dict[str, Any]:
+        cfg = self.settings.nexora
+        state = self._get_setting("nexora.sync") or {}
+        sub = self.active_subscription() if self.linked else None
+        return {
+            "linked": self.linked,
+            "organisation": self.settings.auth.sso_required_org_id or state.get("org_id"),
+            "api_url": cfg.api_url if self.linked else None,
+            "sync_interval_seconds": cfg.sync_interval_seconds,
+            "last_ok": state.get("last_ok"),
+            "last_try": state.get("last_try"),
+            "error": state.get("error"),
+            "plan": self.plan().plan_id.value,
+            "plan_valid_until": sub.current_period_end if sub else None,
+            "events_enabled": self.linked and cfg.events_enabled,
+            "events_pending": self.outbox_depth() if self.linked else 0,
+        }
+
+    def _nexora_loop(self) -> None:
+        interval = self.settings.nexora.sync_interval_seconds
+        # A little jitter so many installations do not call in the same second.
+        wait = random.uniform(0, 10)  # noqa: S311 - scheduling jitter, not security
+        while not self._stop.wait(wait):
+            try:
+                self.sync_nexora()
+            except Exception:
+                log.exception("NEXORA sync pass failed")
+            wait = interval + random.uniform(0, 300)  # noqa: S311
 
     def _stripe(self) -> StripeClient:
         cfg = self.settings.billing
@@ -1243,6 +2015,7 @@ class ControlPlane:
         )
 
     def start_checkout(self, actor: str, *, plan_id: str, interval: str) -> str:
+        self._not_linked()
         price = self.settings.billing.price_id(plan_id, interval)
         plan = entitlements(plan_id)
         if plan.plan_id.value != plan_id or not plan.self_serve or not price:
@@ -1262,6 +2035,7 @@ class ControlPlane:
         return url
 
     def start_portal(self, actor: str) -> str:
+        self._not_linked()
         sub = self.active_subscription()
         if sub is None or not sub.provider_customer_id:
             raise NotFound("no Stripe subscription to manage")
@@ -1274,6 +2048,8 @@ class ControlPlane:
 
     def apply_stripe_webhook(self, raw_body: bytes, signature: str) -> str:
         """Returns "applied" or "ignored"; raises PolicyViolation on a bad signature."""
+        if self.linked:
+            return "ignored"  # NEXORA owns the subscription; a local one must not compete
         cfg = self.settings.billing
         secret = cfg.stripe_webhook_secret.get_secret_value() if cfg.stripe_webhook_secret else ""
         if not secret:
@@ -1453,12 +2229,20 @@ class ControlPlane:
         with self.db.session() as s:
             s.execute(delete(db.FlowRow).where(db.FlowRow.ts < now - self.retention_seconds()))
             s.execute(delete(db.NodeHeartbeat).where(db.NodeHeartbeat.ts < now - 7 * 86400))
+            s.execute(delete(db.LlmUsage).where(db.LlmUsage.ts < now - self.LLM_USAGE_KEEP_SECONDS))
             rolling = s.scalars(
                 select(db.BundleRow).where(db.BundleRow.status == "rolling_out")
             ).all()
             rollouts = [(r.version, r.created_at) for r in rolling]
         for version, _created in rollouts:
             self._evaluate_rollout(version)
+        self.purge_outbox()
+        with self.db.session() as s:
+            s.execute(
+                delete(db.NotificationDelivery).where(
+                    db.NotificationDelivery.created_at < now - 30 * 86400
+                )
+            )
 
     def _evaluate_rollout(self, version: int) -> None:
         dwell = self.settings.policy.rollout_stage_seconds
@@ -1546,8 +2330,15 @@ def _plan_dict(p: Plan) -> dict[str, Any]:
         "nodes_limit": p.nodes_limit,
         "retention_days": p.retention_days,
         "llm_advisor_allowed": p.llm_advisor_allowed,
+        "llm_access": p.llm_access,
         "support": p.support,
         "self_serve": p.self_serve,
         "price_cents_month": p.price_cents_month,
         "price_cents_year": p.price_cents_year,
     }
+
+
+def _url_hint(url: str) -> str:
+    """`https://hooks.example.com/…`: the host only; the path and query may hold a secret."""
+    host = url.split("://", 1)[-1].split("/", 1)[0].split("@")[-1]
+    return f"https://{host}/…"

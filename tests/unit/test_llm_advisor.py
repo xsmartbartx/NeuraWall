@@ -143,3 +143,38 @@ def test_explain_verdict_offline():
     v = Verdict(flow_id="f", action=Action.ALERT, enforced=False, reasons=["anomaly 0.9"])
     text, src = LlmAdvisor(None).explain_verdict(v, None, None)
     assert "Models alone never block" in text and src == DraftSource.HEURISTIC
+
+
+def test_tokens_are_recorded_even_when_the_call_is_refused_or_truncated():
+    """The API bills the tokens whatever the outcome, so the metering must see them."""
+    from types import SimpleNamespace
+
+    import pytest
+
+    from neurawall.core.errors import RecoverableError
+    from neurawall.modules.llm_advisor.backend import ClaudeBackend
+
+    for stop in ("refusal", "max_tokens", "end_turn"):
+        usage = SimpleNamespace(
+            input_tokens=100,
+            output_tokens=40,
+            cache_read_input_tokens=900,
+            cache_creation_input_tokens=0,
+        )
+        response = SimpleNamespace(
+            stop_reason=stop, parsed_output=None, usage=usage, model="claude-test"
+        )
+        backend = ClaudeBackend(
+            api_key="k",
+            model="m",
+            max_tokens=10,
+            effort="low",
+            timeout_seconds=1,
+            server_side_fallbacks=False,
+        )
+        backend._client = SimpleNamespace(
+            beta=SimpleNamespace(messages=SimpleNamespace(parse=lambda r=response, **kw: r))
+        )
+        with pytest.raises(RecoverableError):
+            backend.generate("t", "c", schemas.LlmExplanation)
+        assert backend.last_usage() == ("claude-test", 1000, 40), stop

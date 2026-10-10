@@ -21,7 +21,7 @@ curl -s https://nw.example.com/api/v1/alerts?status=open -H "Authorization: Bear
 
 | Area | Endpoints | Permission |
 |---|---|---|
-| Auth | `POST /auth/login`, `POST /auth/sso` (opt-in, see security.md), `GET /auth/me`, `POST /auth/password` | — |
+| Auth | `POST /auth/login`, `GET /auth/sso/config`, `POST /auth/sso` (opt-in, may create a viewer; see security.md), `GET /auth/me`, `POST /auth/password` | — |
 | Dashboard | `GET /dashboard?hours=` | read |
 | Flows | `GET /flows` (filters: `q`, `action`, `label`, `node`, `alert_id`, `min_score`, `hours`), `GET /flows/{id}`, `POST /flows/{id}/explain` | read / advisor |
 | Alerts | `GET /alerts`, `GET/PATCH /alerts/{id}`, `POST /alerts/{id}/triage`, `POST /alerts/{id}/narrate` | read / triage / advisor |
@@ -30,7 +30,11 @@ curl -s https://nw.example.com/api/v1/alerts?status=open -H "Authorization: Bear
 | Bundles | `GET /bundles`, `POST /bundles/publish`, `POST /bundles/{v}/advance`, `POST /bundles/{v}/rollback` | read / approve |
 | Fleet | `GET /nodes`, `POST /nodes/enrollment-tokens`, `POST /nodes/{id}/revoke` | read / fleet |
 | Users | `GET/POST /users`, `PATCH /users/{id}`, `POST /users/{id}/reset-password` | users |
-| Audit | `GET /audit`, `GET /audit/verify` | audit |
+| Audit | `GET /audit`, `GET /audit/verify`, `GET /audit/export.csv` | audit |
+| Exports | `GET /flows/export.csv`, `GET /alerts/export.csv` (same filters as the lists, 50,000 rows at most) | read |
+| Notifications | `GET/POST /notifications/channels`, `PATCH/DELETE /notifications/channels/{id}`, `POST /notifications/channels/{id}/test`, `GET /notifications/deliveries` | integrations |
+| NEXORA | `GET /nexora/status`, `POST /nexora/sync` (see [nexora.md](nexora.md)) | integrations |
+| Claude usage | `GET /llm/usage` | read |
 | System | `GET /system`, `GET /version`, `GET /pki/bundle-signing-key` | read / public |
 | Agent | `POST /agent/enroll`, `GET /agent/bundle`, `POST /agent/flows`, `POST /agent/heartbeat` | node key |
 

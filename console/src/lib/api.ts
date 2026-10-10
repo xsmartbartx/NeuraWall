@@ -52,6 +52,31 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   return data as T;
 }
 
+/** Downloads a CSV from an authenticated endpoint. Returns true when the server cut the export
+ *  at its row cap, so the caller can say so. */
+export async function downloadCsv(path: string, filename: string): Promise<boolean> {
+  const headers = new Headers();
+  if (memoryToken) headers.set("Authorization", `Bearer ${memoryToken}`);
+  const res = await fetch(`/api/v1${path}`, { headers });
+  if (!res.ok) {
+    if (res.status === 401) onUnauthorized();
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.error ?? "error", data.message ?? res.statusText);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  const max = Number(res.headers.get("X-Export-Max-Rows") ?? 0);
+  const rows = (await blob.text()).split("\r\n").length - 2;
+  return max > 0 && rows >= max;
+}
+
 // ---------------------------------------------------------------- types
 
 export type Action = "allow" | "alert" | "rate_limit" | "drop" | "quarantine";
@@ -132,7 +157,19 @@ export interface NodeRow {
 
 export interface AuditRow { seq: number; ts: number; actor: string; action: string; target: string; detail: Record<string, unknown>; hash: string }
 
-export interface UserRow { id: number; email: string; name: string; role: string; active: boolean; must_change_password: boolean; created_at: number; last_login: number | null }
+export interface UserRow { id: number; email: string; name: string; role: string; active: boolean; must_change_password: boolean; created_at: number; last_login: number | null; auth_provider: string }
+
+export interface Channel {
+  id: number; name: string; url_hint: string; events: string[]; min_severity: Severity; active: boolean;
+  created_by: string; created_at: number;
+  last_delivery: { status: string; http_status: number | null; error: string | null; at: number } | null;
+  signing_secret?: string;
+}
+
+export interface Delivery {
+  id: number; channel_id: number; event_type: string; ref: string; status: string; attempts: number;
+  http_status: number | null; error: string | null; created_at: number; sent_at: number | null;
+}
 
 export interface Dashboard {
   window_hours: number; total_flows: number; enforced_blocks: number; by_action: Record<string, number>;

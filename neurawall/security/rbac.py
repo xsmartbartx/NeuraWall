@@ -30,6 +30,7 @@ class Permission(StrEnum):
     MANAGE_USERS = "users:manage"
     READ_AUDIT = "audit:read"
     MANAGE_SETTINGS = "settings:manage"
+    MANAGE_INTEGRATIONS = "integrations:manage"
 
 
 _GRANTS: dict[Role, frozenset[Permission]] = {

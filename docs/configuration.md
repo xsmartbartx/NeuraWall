@@ -75,6 +75,10 @@ Configuration is layered: **defaults → YAML file → environment → runtime o
 | `auth.sso_audience` | `NEURAWALL_AUTH__SSO_AUDIENCE` | str \| None | — | If set, the token's `aud` claim must equal this (the Clerk JWT template should set it), so a Clerk token minted for another service cannot be replayed here. |
 | `auth.sso_login_url` | `NEURAWALL_AUTH__SSO_LOGIN_URL` | str \| None | — | Where the console sends the browser to obtain a token (the NEXORA account app's handoff URL). Setting it shows "Sign in with NEXORA" on the console login page. |
 | `auth.sso_required_org_id` | `NEURAWALL_AUTH__SSO_REQUIRED_ORG_ID` | str \| None | — | If set, the token must carry this Clerk organisation id (`org_id`), so only members of one organisation can use SSO. |
+| `auth.sso_jit` | `NEURAWALL_AUTH__SSO_JIT` | bool | `False` | Create a `viewer` on the first SSO sign-in of a verified member of `sso_required_org_id` (the token must carry `email_verified: true`). Off by default: SSO then only signs in existing users. A role is never taken from the identity provider; admins promote users. |
+| `auth.sso_session_ttl_seconds` | `NEURAWALL_AUTH__SSO_SESSION_TTL_SECONDS` | int \| None | — | Lifetime of an SSO session. Unset = `access_token_ttl_seconds`, or one hour when `sso_jit` is on (removing someone from the organisation then takes effect within the hour). |
+| `auth.local_login` | `NEURAWALL_AUTH__LOCAL_LOGIN` | `enabled` / `admin_only` | `enabled` | `enabled` = anyone with a password may use it. `admin_only` = password sign-in is kept for admins (break-glass); everyone else uses SSO. |
+| `auth.demo_public_login` | `NEURAWALL_AUTH__DEMO_PUBLIC_LOGIN` | bool | `False` | Public "Try the demo" sign-in as a read-only viewer, for a *separate demo instance* with synthetic traffic. Refused at startup unless `demo_mode` is on, and on any instance that is linked to NEXORA, has Stripe keys or a Claude API key. |
 
 ## `billing`
 
@@ -90,6 +94,18 @@ Configuration is layered: **defaults → YAML file → environment → runtime o
 | `billing.price_business_year` | `NEURAWALL_BILLING__PRICE_BUSINESS_YEAR` | str \| None | — |  |
 | `billing.price_enterprise_month` | `NEURAWALL_BILLING__PRICE_ENTERPRISE_MONTH` | str \| None | — |  |
 | `billing.price_enterprise_year` | `NEURAWALL_BILLING__PRICE_ENTERPRISE_YEAR` | str \| None | — |  |
+| `billing.llm_calls_business` | `NEURAWALL_BILLING__LLM_CALLS_BUSINESS` | int | `3000` | Claude calls per UTC month included with Business. Over it, the offline advisor answers until the month ends. Placeholder until the plan limits are decided. |
+| `billing.llm_calls_enterprise` | `NEURAWALL_BILLING__LLM_CALLS_ENTERPRISE` | int | `15000` | Claude calls per UTC month included with Enterprise. |
+
+## `nexora`
+
+| Key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `nexora.api_url` | `NEURAWALL_NEXORA__API_URL` | str | `https://api.onenexora.com` | NEXORA API base URL. Must be https (http only for localhost, in tests). |
+| `nexora.api_key` | `NEURAWALL_NEXORA__API_KEY` | SecretStr \| None | — | An organisation API key (`nx_live_…`) allowed to read this organisation's NeuraWall entitlement and write usage events. Empty = standalone installation. |
+| `nexora.console_url` | `NEURAWALL_NEXORA__CONSOLE_URL` | str | `https://console.onenexora.com` | Where "manage your plan" sends people (the NEXORA console). |
+| `nexora.sync_interval_seconds` | `NEURAWALL_NEXORA__SYNC_INTERVAL_SECONDS` | int | `3600` | How often the plan is re-read. |
+| `nexora.events_enabled` | `NEURAWALL_NEXORA__EVENTS_ENABLED` | bool | `True` | Send usage events (counts only: no addresses, no emails, no flow data). |
 
 ## Production requirements
 

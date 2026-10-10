@@ -1,0 +1,40 @@
+source,url,date,rating,text
+hacker-news,https://news.ycombinator.com/item?id=48589393,2026-06-18,,"Basic routing and switching - expect line speed.
+Don't expect analysis features to run at line speed - 30-50% penalty could be normal depending on throughput.
+
+Stay away from IPS and complicated firewall rules which usually are done in CPU, and you should be fine. HW acceleration for those (esp. TLS decryption) is a major reason fancy firewalls are very expensive. You're better off building an IDS or picking up a smaller FortiGate or Palo Alto firewall if you really want to get serious there."
+hacker-news,https://news.ycombinator.com/item?id=39640334,2024-03-08,,"TLS 1.3 with cert pinning and end-to-end encryption is making life hell for corporate compliance. Our Palo Alto firewalls are about as good as it gets but it's a constant battle to de-obfuscate traffic.
+
+Google loves to mix traffic types (ad, telemetry, biz app) across protocols basically creating their own overlay which is a huge pain.
+
+For Apple, we basically have to exempt the entire 17.0.0.0/8 as that is theirs and they pin everything.
+
+Microsoft at least has several dynamic lists but I have my own list of their stuff that ISN'T on their lists (a few hundred IPs).
+
+At this point I don't think there's any way to secure a network. You can't trust or verify much of the traffic.
+
+Maybe using a synthetic NIC at the endpoint that is directly tied to the policy system is the only way forward."
+hacker-news,https://news.ycombinator.com/item?id=47575367,2026-03-30,,"Routing is pretty easy for most use cases... firewalling an Internet connection, on the other hand, is just about impossible (thanks TLS 1.3) without pretty serious overhead, 3rd party maintained live subscriptions, TLS interception, and a willingness to say ""no"" to a lot of the shenanigans that modern programs and devices try to pull.
+
+I recommend the free home version of Sophos for the least painful way to do it. Buy a Palo Alto with a full subscription if you are really serious."
+hacker-news,https://news.ycombinator.com/item?id=47504380,2026-03-24,,"A Palo Alto 440 is what I would consider a baseline for 'real' security. Way too expensive and complicated for most if not all home users.
+
+I keep recommending the free version of Sophos firewall for home users. It's still a bit of a bear to configure."
+hacker-news,https://news.ycombinator.com/item?id=42256727,2024-11-27,,"I used to be a openwrt contributor. It was never anything fancy.
+
+Automatic firmware updates would be my vote if i could vote.
+
+I wish they had add ""next gen firewall"" to the list. Go compete with palo, fortinet, or sonicwall. Be able to have threatfeeds blocking. Having those extra features would be huge."
+hacker-news,https://news.ycombinator.com/item?id=38541881,2023-12-06,,"""Cisco's first lash at this stuff is an AI Assistant for Firewall Policy that assesses firewall rules and, using a natural language interface, allows admins to identify policies that could usefully be tweaked or removed.""
+
+To read between the lines: either the firewall product or its users are so bad that you need an AI to fix the issues."
+hacker-news,https://news.ycombinator.com/item?id=42755626,2025-01-19,,"I found that over time ufw becomes unwieldy and it's hard to make sure you keep the rules consistent - even (especially?) with configuration management.
+
+I highly recommend firewalld instead."
+hacker-news,https://news.ycombinator.com/item?id=47325268,2026-03-10,,"Tested prompt injection specifically last week — ran 18 attack vectors against PromptGuard (an AI security firewall). 12 bypassed with 100% confidence.
+
+What got through consistently: unicode homoglyphs (Ignøre prеvious...), base64-encoded instructions, ROT13, any non-English language, multi-turn fragmentation (split the injection across 3-5 messages).
+
+Your #3 is actually harder to test than most teams realize, because it requires modeling adversarial intent — not just known attack signatures. Pattern-matching at the proxy layer doesn't catch encoding attacks or language-switched instructions.
+
+I'm running adversarial red-team audits on agent security tooling. Full PromptGuard breakdown going out as a coordinated disclosure. Happy to share the methodology — it's surprisingly cheap to run systematically against your own stack before shipping."

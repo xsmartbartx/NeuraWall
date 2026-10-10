@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any, TypeVar, cast
 
 import anthropic
@@ -63,6 +64,7 @@ class ClaudeBackend:
         self.max_tokens = max_tokens
         self.effort = effort
         self.server_side_fallbacks = server_side_fallbacks
+        self._usage = threading.local()
         self._client = anthropic.Anthropic(
             api_key=api_key,
             timeout=timeout_seconds,
@@ -70,7 +72,12 @@ class ClaudeBackend:
             default_headers={"anthropic-workspace-id": workspace_id} if workspace_id else None,
         )
 
+    def last_usage(self) -> tuple[str, int, int]:
+        """(model, input tokens, output tokens) of this thread's latest call."""
+        return getattr(self._usage, "value", (self.model, 0, 0))  # type: ignore[no-any-return]
+
     def generate(self, task: str, context: str, output: type[T]) -> T:
+        self._usage.value = (self.model, 0, 0)
         kwargs: dict[str, object] = {}
         if self.server_side_fallbacks:
             kwargs["betas"] = ["server-side-fallback-2026-07-01"]
@@ -94,6 +101,13 @@ class ClaudeBackend:
             raise RecoverableError("Claude API unreachable") from exc
         except anthropic.APIStatusError as exc:
             raise RecoverableError(f"Claude API error {exc.status_code}") from exc
+
+        # The API has billed these tokens whatever the outcome below, so record them now.
+        usage = response.usage
+        cached = (getattr(usage, "cache_read_input_tokens", 0) or 0) + (
+            getattr(usage, "cache_creation_input_tokens", 0) or 0
+        )
+        self._usage.value = (response.model, usage.input_tokens + cached, usage.output_tokens)
 
         if response.stop_reason == "refusal":
             raise RecoverableError("Claude declined the request")

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import func, or_, select
 
@@ -26,6 +27,7 @@ from neurawall.modules.flow_collector.ingest import parse_flows
 from neurawall.security.rbac import Permission, Role, permissions_for
 from neurawall.security.sso import verify_sso_token
 from neurawall.services.control_plane import db
+from neurawall.services.control_plane.api import export
 from neurawall.services.control_plane.api import serializers as ser
 from neurawall.services.control_plane.api.deps import (
     Principal,
@@ -132,7 +134,13 @@ def sso_config(cp: CP) -> dict[str, Any]:
     send the browser. Exposes no secret: both values are already visible to any visitor."""
     auth = cp.settings.auth
     enabled = bool(auth.sso_jwks_url and auth.sso_login_url)
-    return {"enabled": enabled, "login_url": auth.sso_login_url if enabled else None}
+    return {
+        "enabled": enabled,
+        "login_url": auth.sso_login_url if enabled else None,
+        "jit": bool(enabled and auth.sso_jit),
+        "local_login": auth.local_login,
+        "demo": auth.demo_public_login,
+    }
 
 
 @api.post("/auth/sso", tags=["auth"])
@@ -152,11 +160,28 @@ def login_sso(body: SsoIn, request: Request, cp: CP) -> dict[str, Any]:
         audience=auth.sso_audience,
         required_org_id=auth.sso_required_org_id,
     )
-    token, user = cp.login_sso(identity.email)
+    token, user = cp.login_sso(identity)
     return {
         "access_token": token,
         "token_type": "bearer",
-        "expires_in": auth.access_token_ttl_seconds,
+        "expires_in": auth.sso_ttl_seconds,
+        "user": ser.user(user),
+    }
+
+
+@api.post("/auth/demo", tags=["auth"])
+def login_demo(request: Request, cp: CP) -> dict[str, Any]:
+    """Guest viewer session for a public demo instance. 404 everywhere else."""
+    if not cp.settings.auth.demo_public_login:
+        raise NotFound("the public demo is not enabled")
+    client = request.client.host if request.client else "unknown"
+    if not request.app.state.demo_limiter.allow(client):
+        raise PolicyViolation("too many demo sessions from this address; try again later")
+    token, user = cp.login_demo()
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": cp.DEMO_SESSION_SECONDS,
         "user": ser.user(user),
     }
 
@@ -236,20 +261,15 @@ def dashboard(
 # ---------------------------------------------------------------- flows
 
 
-@api.get("/flows", tags=["flows"])
-def list_flows(
-    cp: CP,
-    _: Reader,
-    q: Annotated[str | None, Query(max_length=253)] = None,
-    action: Annotated[str | None, Query(max_length=16)] = None,
-    label: Annotated[str | None, Query(max_length=40)] = None,
-    node: Annotated[str | None, Query(max_length=64)] = None,
-    alert_id: int | None = None,
-    min_score: Annotated[float | None, Query(ge=0, le=1)] = None,
-    hours: Annotated[int, Query(ge=1, le=24 * 30)] = 24,
-    limit: Annotated[int, Query(ge=1, le=500)] = 100,
-    offset: Annotated[int, Query(ge=0)] = 0,
-) -> dict[str, Any]:
+def _flows_statement(
+    q: str | None,
+    action: str | None,
+    label: str | None,
+    node: str | None,
+    alert_id: int | None,
+    min_score: float | None,
+    hours: int,
+) -> Any:
     stmt = select(db.FlowRow).where(db.FlowRow.ts >= time.time() - hours * 3600)
     if q:
         like = f"%{q}%"
@@ -273,10 +293,102 @@ def list_flows(
         stmt = stmt.where(db.FlowRow.alert_id == alert_id)
     if min_score is not None:
         stmt = stmt.where(db.FlowRow.anomaly_score >= min_score)
+    return stmt
+
+
+@api.get("/flows", tags=["flows"])
+def list_flows(
+    cp: CP,
+    _: Reader,
+    q: Annotated[str | None, Query(max_length=253)] = None,
+    action: Annotated[str | None, Query(max_length=16)] = None,
+    label: Annotated[str | None, Query(max_length=40)] = None,
+    node: Annotated[str | None, Query(max_length=64)] = None,
+    alert_id: int | None = None,
+    min_score: Annotated[float | None, Query(ge=0, le=1)] = None,
+    hours: Annotated[int, Query(ge=1, le=24 * 30)] = 24,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> dict[str, Any]:
+    stmt = _flows_statement(q, action, label, node, alert_id, min_score, hours)
     with cp.db.session() as s:
         total = s.scalar(select(func.count()).select_from(stmt.subquery())) or 0
         rows = s.scalars(stmt.order_by(db.FlowRow.ts.desc()).offset(offset).limit(limit)).all()
         return {"total": total, "items": [ser.flow_summary(r) for r in rows]}
+
+
+def _csv_response(name: str, chunks: Any, truncated_hint: int) -> StreamingResponse:
+    return StreamingResponse(
+        chunks,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{name}"',
+            "X-Export-Max-Rows": str(truncated_hint),
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@api.get("/flows/export.csv", tags=["flows"])
+def export_flows(
+    cp: CP,
+    actor: Reader,
+    q: Annotated[str | None, Query(max_length=253)] = None,
+    action: Annotated[str | None, Query(max_length=16)] = None,
+    label: Annotated[str | None, Query(max_length=40)] = None,
+    node: Annotated[str | None, Query(max_length=64)] = None,
+    alert_id: int | None = None,
+    min_score: Annotated[float | None, Query(ge=0, le=1)] = None,
+    hours: Annotated[int, Query(ge=1, le=24 * 30)] = 24,
+) -> StreamingResponse:
+    """Metadata of the filtered flows as CSV (no payloads exist to export), newest first."""
+    stmt = _flows_statement(q, action, label, node, alert_id, min_score, hours)
+    cp.audit(actor.email, "export.flows", "flows", {"hours": hours, "action": action or ""})
+
+    def page(offset: int, limit: int) -> list[list[Any]]:
+        with cp.db.session() as s:
+            rows = s.scalars(
+                stmt.order_by(db.FlowRow.ts.desc(), db.FlowRow.flow_id).offset(offset).limit(limit)
+            ).all()
+            return [
+                [
+                    r.flow_id,
+                    export.iso(r.ts),
+                    r.node_id,
+                    r.src_ip,
+                    r.dst_ip,
+                    r.dst_port,
+                    r.protocol,
+                    r.bytes_total,
+                    r.action,
+                    r.enforced,
+                    r.rule_id or "",
+                    r.anomaly_score if r.anomaly_score is not None else "",
+                    r.labels,
+                    r.host or "",
+                    r.alert_id if r.alert_id is not None else "",
+                ]
+                for r in rows
+            ]
+
+    header = [
+        "flow_id",
+        "time_utc",
+        "node_id",
+        "src_ip",
+        "dst_ip",
+        "dst_port",
+        "protocol",
+        "bytes_total",
+        "action",
+        "enforced",
+        "rule_id",
+        "anomaly_score",
+        "labels",
+        "host",
+        "alert_id",
+    ]
+    return _csv_response("flows.csv", export.stream_csv(header, page), export.MAX_ROWS)
 
 
 @api.get("/flows/{flow_id}", tags=["flows"])
@@ -309,6 +421,55 @@ def list_alerts(
 ) -> dict[str, Any]:
     rows, total = cp.list_alerts(status=status, severity=severity, limit=limit, offset=offset)
     return {"total": total, "items": [ser.alert(a) for a in rows]}
+
+
+@api.get("/alerts/export.csv", tags=["alerts"])
+def export_alerts(
+    cp: CP, actor: Reader, status: str | None = None, severity: str | None = None
+) -> StreamingResponse:
+    cp.audit(actor.email, "export.alerts", "alerts", {"status": status or ""})
+
+    def page(offset: int, limit: int) -> list[list[Any]]:
+        rows, _ = cp.list_alerts(status=status, severity=severity, limit=limit, offset=offset)
+        return [
+            [
+                a.id,
+                a.status,
+                a.severity,
+                a.title,
+                a.summary,
+                a.labels,
+                a.src_ip,
+                a.dst_ip,
+                a.node_id,
+                a.flow_count,
+                a.blocked_count,
+                round(a.max_score, 3),
+                export.iso(a.first_seen),
+                export.iso(a.last_seen),
+                a.assignee or "",
+            ]
+            for a in rows
+        ]
+
+    header = [
+        "id",
+        "status",
+        "severity",
+        "title",
+        "summary",
+        "labels",
+        "src_ip",
+        "dst_ip",
+        "node_id",
+        "flow_count",
+        "blocked_count",
+        "max_score",
+        "first_seen_utc",
+        "last_seen_utc",
+        "assignee",
+    ]
+    return _csv_response("alerts.csv", export.stream_csv(header, page), export.MAX_ROWS)
 
 
 @api.get("/alerts/{alert_id}", tags=["alerts"])
@@ -528,6 +689,29 @@ def list_audit(
         return {"total": total, "items": [ser.audit(r) for r in rows]}
 
 
+@api.get("/audit/export.csv", tags=["audit"])
+def export_audit(
+    cp: CP, actor: Auditor, action: Annotated[str | None, Query(max_length=100)] = None
+) -> StreamingResponse:
+    stmt = select(db.AuditRow)
+    if action:
+        stmt = stmt.where(db.AuditRow.action.startswith(action))
+    cp.audit(actor.email, "export.audit", "audit", {"action": action or ""})
+
+    def page(offset: int, limit: int) -> list[list[Any]]:
+        with cp.db.session() as s:
+            rows = s.scalars(
+                stmt.order_by(db.AuditRow.seq.desc()).offset(offset).limit(limit)
+            ).all()
+            return [
+                [r.seq, export.iso(r.ts), r.actor, r.action, r.target, json.dumps(r.detail), r.hash]
+                for r in rows
+            ]
+
+    header = ["seq", "time_utc", "actor", "action", "target", "detail", "hash"]
+    return _csv_response("audit.csv", export.stream_csv(header, page), export.MAX_ROWS)
+
+
 @api.get("/audit/verify", tags=["audit"])
 def verify_audit(cp: CP, _: Auditor) -> dict[str, Any]:
     try:
@@ -665,3 +849,103 @@ async def billing_webhook(request: Request, cp: CP) -> dict[str, str]:
     except PolicyViolation as exc:
         raise Unauthenticated(exc.message) from exc
     return {"status": status}
+
+
+# ---------------------------------------------------------------- NEXORA link
+
+Integrator = Annotated[Principal, Depends(require(Permission.MANAGE_INTEGRATIONS))]
+
+
+@api.get("/nexora/status", tags=["nexora"])
+def nexora_status(cp: CP, _: Integrator) -> dict[str, Any]:
+    """Link state: organisation, last sync, current plan. The API key is never returned."""
+    return cp.nexora_status()
+
+
+@api.post("/nexora/sync", tags=["nexora"])
+def nexora_sync(cp: CP, actor: Integrator) -> dict[str, Any]:
+    """Re-read the plan from NEXORA now (6 per hour)."""
+    if not cp.linked:
+        raise NotFound("this installation is not linked to NEXORA")
+    return cp.sync_nexora_manually(actor.email)
+
+
+# ---------------------------------------------------------------- Claude usage
+
+
+@api.get("/llm/usage", tags=["advisor"])
+def llm_usage(cp: CP, _: Reader) -> dict[str, Any]:
+    """Tier 3 calls this UTC month against the plan's budget (budget is null when uncapped)."""
+    return cp.llm_usage()
+
+
+# ---------------------------------------------------------------- notifications
+
+NotifyEvent = Literal["alert.created", "draft.pending"]
+Severity = Literal["low", "medium", "high", "critical"]
+
+
+class ChannelIn(Body):
+    name: str = Field(min_length=1, max_length=80, pattern=r"\S")
+    url: str = Field(min_length=1, max_length=500)
+    events: list[NotifyEvent] = Field(min_length=1, max_length=2)
+    min_severity: Severity = "high"
+
+
+class ChannelPatch(Body):
+    name: str | None = Field(None, min_length=1, max_length=80, pattern=r"\S")
+    url: str | None = Field(None, min_length=1, max_length=500)
+    events: list[NotifyEvent] | None = Field(None, min_length=1, max_length=2)
+    min_severity: Severity | None = None
+    active: bool | None = None
+    rotate_secret: bool = False
+
+
+@api.get("/notifications/channels", tags=["notifications"])
+def list_channels(cp: CP, _: Integrator) -> list[dict[str, Any]]:
+    return cp.list_channels()
+
+
+@api.post("/notifications/channels", tags=["notifications"], status_code=201)
+def create_channel(body: ChannelIn, cp: CP, actor: Integrator) -> dict[str, Any]:
+    """Create a webhook channel. The signing secret is in the answer once and is not shown again."""
+    channel, secret = cp.create_channel(
+        actor.email,
+        name=body.name.strip(),
+        url=body.url,
+        events=list(body.events),
+        min_severity=body.min_severity,
+    )
+    return {**channel, "signing_secret": secret}
+
+
+@api.patch("/notifications/channels/{channel_id}", tags=["notifications"])
+def update_channel(
+    channel_id: int, body: ChannelPatch, cp: CP, actor: Integrator
+) -> dict[str, Any]:
+    channel, secret = cp.update_channel(
+        actor.email,
+        channel_id,
+        name=body.name.strip() if body.name else None,
+        url=body.url,
+        events=list(body.events) if body.events else None,
+        min_severity=body.min_severity,
+        active=body.active,
+        rotate_secret=body.rotate_secret,
+    )
+    return {**channel, "signing_secret": secret} if secret else channel
+
+
+@api.delete("/notifications/channels/{channel_id}", tags=["notifications"], status_code=204)
+def delete_channel(channel_id: int, cp: CP, actor: Integrator) -> None:
+    cp.delete_channel(actor.email, channel_id)
+
+
+@api.post("/notifications/channels/{channel_id}/test", tags=["notifications"])
+def test_channel(channel_id: int, cp: CP, actor: Integrator) -> dict[str, Any]:
+    return cp.test_channel(actor.email, channel_id)
+
+
+@api.get("/notifications/deliveries", tags=["notifications"])
+def list_deliveries(cp: CP, _: Integrator, channel_id: int | None = None) -> list[dict[str, Any]]:
+    return cp.list_deliveries(channel_id)

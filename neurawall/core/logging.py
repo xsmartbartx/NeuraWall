@@ -25,6 +25,7 @@ _SENSITIVE_KEYS = re.compile(
 _BEARER = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]+")
 _URL_QUERY = re.compile(r"(https?://[^\s?#]+|(?<![\w/])/[^\s?#]*)\?[^\s#]*")
 _ANTHROPIC_KEY = re.compile(r"sk-ant-[A-Za-z0-9_-]{8,}")
+_PLATFORM_KEY = re.compile(r"\b(?:nx_live|nx_test|nwk|nwe|whsec)_[A-Za-z0-9_-]{8,}")
 _JWT = re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}")
 
 REDACTED = "[REDACTED]"
@@ -34,6 +35,7 @@ _MAX_STR = 1024
 def redact_text(value: str) -> str:
     value = _BEARER.sub(lambda m: f"{m.group(1)} {REDACTED}", value)
     value = _ANTHROPIC_KEY.sub(REDACTED, value)
+    value = _PLATFORM_KEY.sub(REDACTED, value)
     value = _JWT.sub(REDACTED, value)
     value = _URL_QUERY.sub(lambda m: m.group(1) + "?" + REDACTED, value)
     if len(value) > _MAX_STR:

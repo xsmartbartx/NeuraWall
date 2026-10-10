@@ -1,0 +1,39 @@
+feature,area,priority,original,clone,notes
+Three-tier inference (anomaly + L7 classifier + Claude advisor),detection,must,yes,yes,Tier 1/2 central; Tier 3 has an offline fallback
+Policy engine is the only thing that can block,enforcement,must,yes,yes,import-linter forbids advisor importing policy engine
+Human-approved rule drafts with blast-radius simulation,approvals,must,yes,yes,S08-S09
+Ed25519-signed policy bundles verified by nodes,enforcement,must,yes,yes,anti-replay; last-known-good on node
+Canary rollout 5/25/100 with auto-rollback,enforcement,must,yes,yes,S13
+Hash-chained tamper-evident audit trail + verify,audit,must,yes,yes,S15
+RBAC (viewer/analyst/operator/approver/admin) + optional four-eyes,access,must,yes,yes,S16
+Node enrollment and fleet view,fleet,must,yes,yes,S14; nftables and dry-run backends
+Plan entitlements enforced (nodes / retention / advisor),billing,must,yes,yes,fails closed to Community; 3-day grace
+Stripe checkout + portal + signed webhook,billing,must,yes,yes,own products and portal config on shared account
+Sign in with NEXORA button (Clerk token via fragment + state),identity,must,yes,yes,live; docs line stale
+Sign in works for a NEXORA customer who has no NeuraWall user,identity,must,yes,partial,"built (auth.sso_jit, viewer only); needs email_verified in the Clerk JWT template and the flag on (N4)"
+NeuraWall identity and entitlements come from NEXORA Core (org-scoped),platform,must,yes,partial,"plan pull and org binding built; identity stays a local role projection (deviation from T-2, see architecture D6); needs N1 on the NEXORA side"
+Org model (one account -> many orgs -> NeuraWall tenant),platform,should,yes,skip,decided: one installation = one organisation (D2); two orgs need two installations; multi-tenant is a separate project
+Usage events visible in NEXORA console Usage feed,platform,should,yes,partial,"sender built (outbox, retries, counts only); needs N2 on the NEXORA side"
+Listed in NEXORA registry and /v1/products,platform,should,yes,yes,beta listing exists on the NEXORA side
+"Claude AI ""billed separately"" on Pro",billing,must,yes,yes,"Pro uses the customer's own Anthropic key and is metered, not capped; pricing page copy still to update (N6)"
+Claude AI usage budget included on Business and Enterprise,billing,must,yes,yes,"metered per UTC month, offline advisor when used up; 3,000 / 15,000 are placeholders; pricing page copy to update (N6)"
+Public docs for NeuraWall on docs.onenexora.com,docs,should,yes,partial,docs/nexora.md written in this repo; the docs.onenexora.com entry is N5
+Console screenshots and demo on the product page,marketing,should,yes,no,needs the separate demo instance running; then screenshots
+Visitor self-serve trial or hosted demo,onboarding,should,yes,partial,'Try the demo' guest sign-in built and guarded; the separate demo instance is not deployed
+MFA / TOTP for console users,access,should,yes,partial,SSO-only mode (auth.local_login=admin_only) delegates MFA to Clerk; no TOTP for local accounts
+Alert notifications (email / Slack / PagerDuty / webhook out),integrations,should,yes,yes,signed SSRF-safe webhooks with retries and delivery log; no SMTP by design (D10)
+SIEM / syslog export of alerts and audit,integrations,could,yes,partial,webhook JSON and CSV export; no syslog or CEF
+CSV / JSON export from flows and alerts,reporting,could,yes,yes,"CSV for flows, alerts, audit; formula-injection safe; 50,000 row cap"
+High availability control plane (more than one replica),operations,could,yes,no,deliberate: in-memory baselines; Helm pins replicas 1
+Prometheus metrics and health endpoints,operations,should,yes,yes,/metrics /healthz /readyz
+Helm chart + systemd units + compose,deployment,should,yes,yes,
+CI: lint types layers tests coverage 80 + Postgres + CodeQL + pip-audit,quality,should,yes,yes,
+eBPF/XDP datapath backend,enforcement,could,yes,skip,deliberately later (ADR-0002)
+TLS interception for L7 on encrypted traffic,detection,could,no,skip,rejected on purpose (ADR-0004)
+SOC 2 / ISO 27001,compliance,could,yes,skip,process and audit rather than code
+Console text and form fields meet WCAG AA contrast (both themes),accessibility,should,yes,yes,"37 pairs per theme, 0 failures; new --border-input role"
+Claude usage per month visible to admins,billing,should,yes,yes,Billing page meter and GET /llm/usage
+Published detector evasion report (what Tier 2 catches and misses),detection,should,no,no,"fix #1, thin evidence (reviews.csv)"
+"""What we detect without decrypting"" page in docs and on the product page",docs,should,no,no,"fix #2, thin evidence"
+One-click cleanup draft from a rule hygiene finding,approvals,could,no,no,"fix #3, thin evidence"
+Blast radius and last-match count on the Rules page,approvals,could,no,no,"fix #4, thin evidence"

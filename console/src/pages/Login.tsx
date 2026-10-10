@@ -5,7 +5,7 @@ import { useAuth } from "../lib/hooks";
 import { consumeSsoFragment, startSso, type SsoConfig } from "../lib/sso";
 
 export function Login() {
-  const { login, loginWithSso } = useAuth();
+  const { login, loginWithSso, loginDemo } = useAuth();
   const [sso, setSso] = useState<SsoConfig | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,6 +50,18 @@ export function Login() {
             onClick={() => { try { startSso(sso.login_url!); } catch (err) { setError((err as Error).message); } }}>
             Sign in with NEXORA
           </button>
+        )}
+        {sso?.demo && (
+          <button type="button" disabled={busy} style={{ justifyContent: "center" }}
+            onClick={async () => { setBusy(true); setError(null); try { await loginDemo(); } catch (err) { setError((err as Error).message); } finally { setBusy(false); } }}>
+            Try the demo
+          </button>
+        )}
+        {sso?.demo && <p className="muted" style={{ margin: 0, fontSize: 12 }}>The demo is read-only and shows synthetic traffic. Nothing you do here touches a real network.</p>}
+        {sso?.enabled && sso.local_login === "admin_only" && (
+          <p className="muted" style={{ margin: 0, fontSize: 12 }}>
+            Team members sign in with NEXORA. Password sign-in is kept for administrators.
+          </p>
         )}
         <p className="faint" style={{ margin: 0, fontSize: 12 }}>
           First login? The bootstrap admin password is in <code>initial-admin-password.txt</code> in the server's data directory.

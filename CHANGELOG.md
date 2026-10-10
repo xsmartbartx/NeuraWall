@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Linked mode (optional): an installation can belong to one NEXORA organisation. The plan is pulled from
+  NEXORA, usage events (counts only) go back through an outbox (queued in memory, persisted within about 15 s, retried; a crash can lose the last few seconds), and a plan change never changes
+  what nodes enforce. See [docs/nexora.md](docs/nexora.md).
+- Just-in-time users: with `auth.sso_jit`, a verified member of the required organisation signs in without
+  an admin creating the account first. They start as viewers; roles never come from the identity provider.
+  `auth.local_login=admin_only` keeps password sign-in for admins only.
+- Claude metering: every call that reaches the model is counted. Business and Enterprise get a monthly call
+  budget (the offline advisor answers once it is used); Pro uses the customer's own Anthropic key.
+- Webhook notifications (Integrations page): signed, SSRF-safe, with retries and a delivery log.
+- CSV export of flows, alerts and the audit trail, safe against spreadsheet formula injection.
+- Public demo sign-in for a separate demo instance (`auth.demo_public_login`).
+- Console contrast fixed to WCAG AA in both themes (new `--border-input` role for form fields).
+
+### Fixed
+- `last_login` and a newly linked SSO identity were never saved (the user was detached from the session
+  before the update was flushed).
+- `docs/security.md` said the console had no SSO button.
+
 ## [1.1.0] — 2026-09-27
 
 ### Added

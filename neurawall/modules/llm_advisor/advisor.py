@@ -8,6 +8,7 @@ advisor when Claude is not configured, over budget or unavailable.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Protocol, TypeVar
 
 from pydantic import BaseModel
@@ -39,6 +40,25 @@ class Backend(Protocol):
     def generate(self, task: str, context: str, output: type[T]) -> T: ...
 
 
+@dataclass(frozen=True)
+class CallRecord:
+    """One call that reached the model, for metering. No prompt or answer is kept."""
+
+    kind: str  # triage | draft | narrate | explain
+    model: str
+    input_tokens: int
+    output_tokens: int
+    outcome: str  # ok | refused | error
+
+
+_KINDS = {
+    "LlmAlertSummary": "triage",
+    "LlmRuleDraft": "draft",
+    "LlmIncidentNarrative": "narrate",
+    "LlmExplanation": "explain",
+}
+
+
 class LlmAdvisor:
     def __init__(
         self,
@@ -46,17 +66,29 @@ class LlmAdvisor:
         *,
         max_calls_per_hour: int = 120,
         allowed: Callable[[], bool] = lambda: True,
+        within_budget: Callable[[], bool] = lambda: True,
+        on_call: Callable[[CallRecord], None] | None = None,
     ) -> None:
         self.backend = backend
         self.budget = HourlyBudget(max_calls_per_hour)
         self.last_error: str | None = None
         #: Entitlement gate (e.g. the subscription plan). False = offline advisor only.
         self.allowed = allowed
+        #: Plan budget (e.g. calls per month). False = offline advisor until it resets.
+        #: The check and the usage row (written after the call returns) are not atomic, so
+        #: calls already in flight can overshoot the budget by at most the number of concurrent
+        #: callers (the tier3 worker plus request handlers). That is accepted: serialising the
+        #: model calls behind a lock would stall triage for seconds at a time.
+        self.within_budget = within_budget
+        #: Metering hook, called once per call that reached the model.
+        self.on_call = on_call
 
     @property
     def mode(self) -> str:
         if self.backend is None or not self.allowed():
             return "offline"
+        if not self.within_budget():
+            return "budget_reached"
         return "degraded" if self.last_error else "online"
 
     # -- public API -----------------------------------------------------------
@@ -125,19 +157,45 @@ class LlmAdvisor:
     def _run(
         self, task: str, payload: dict[str, object], output: type[T], fallback: object
     ) -> tuple[T, DraftSource]:
-        if self.backend is not None and self.allowed() and self.budget.try_spend():
+        if (
+            self.backend is not None
+            and self.allowed()
+            and self.within_budget()
+            and self.budget.try_spend()
+        ):
             markers = guardrails.injection_markers(payload)
             context = guardrails.wrap_untrusted(payload | {"injection_markers": markers})
             try:
                 result = self.backend.generate(task, context, output)
                 self.last_error = None
                 _calls.inc(source="llm", outcome="ok")
+                self._record(output, "ok")
                 return result, DraftSource.LLM
             except RecoverableError as exc:
                 self.last_error = exc.message
                 _calls.inc(source="llm", outcome="error")
+                self._record(output, "refused" if "declined" in exc.message else "error")
                 log.warning("tier3 degraded to heuristic advisor", error=exc.message)
         elif self.backend is not None:
             _calls.inc(source="llm", outcome="budget_exhausted")
         _calls.inc(source="heuristic", outcome="ok")
         return fallback(), DraftSource.HEURISTIC  # type: ignore[operator]
+
+    def _record(self, output: type[BaseModel], outcome: str) -> None:
+        if self.on_call is None:
+            return
+        usage = getattr(self.backend, "last_usage", None)
+        model, tokens_in, tokens_out = usage() if callable(usage) else ("", 0, 0)
+        try:
+            self.on_call(
+                CallRecord(
+                    kind=_KINDS.get(output.__name__, "triage"),
+                    model=model,
+                    input_tokens=tokens_in,
+                    output_tokens=tokens_out,
+                    outcome=outcome,
+                )
+            )
+        except Exception:
+            # Metering must never break triage.
+            log.exception("could not record a Tier 3 call")

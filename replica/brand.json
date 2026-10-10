@@ -1,0 +1,5 @@
+{
+  "avoid": ["Palo Alto", "Fortinet", "Fortigate", "Darktrace", "Vectra", "CrowdStrike", "Sophos", "Check Point"],
+  "domains": ["paloaltonetworks.com", "fortinet.com", "darktrace.com", "vectra.ai", "crowdstrike.com"],
+  "colors": []
+}

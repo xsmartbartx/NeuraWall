@@ -8,6 +8,9 @@ const STATE_KEY = "neurawall.sso.state";
 export interface SsoConfig {
   enabled: boolean;
   login_url: string | null;
+  jit: boolean;
+  local_login: "enabled" | "admin_only";
+  demo: boolean;
 }
 
 function randomState(): string {

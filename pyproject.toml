@@ -106,6 +106,8 @@ modules = [
     "neurawall.modules.datapath",
     "neurawall.modules.policy_engine",
     "neurawall.modules.billing",
+    "neurawall.modules.nexora",
+    "neurawall.modules.notify",
 ]
 
 [[tool.importlinter.contracts]]
