@@ -277,3 +277,12 @@ def test_empty_nexora_settings_mean_standalone(tmp_path):
         nexora={"api_key": "", "api_url": "", "console_url": ""},
     )
     assert not s.nexora.linked and s.nexora.api_url == "https://api.onenexora.com"
+
+
+@pytest.mark.parametrize("bad", ["NaN", "Infinity", "-Infinity"])
+def test_a_non_finite_period_end_is_refused(tmp_path, bad):
+    body = f'{{"org_id": "{ORG}", "plan_id": "pro", "current_period_end": {bad}}}'.encode()
+    cp, client = make(tmp_path, lambda req: httpx.Response(200, content=body))
+    with client:
+        assert "unreadable" in cp.sync_nexora()["error"]
+        assert cp.plan().plan_id.value == "community"

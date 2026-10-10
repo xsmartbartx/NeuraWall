@@ -40,7 +40,7 @@ The product is a backend, so this is the checklist applied to what was built. No
 | NEXORA Core | `GET /v1/entitlements/neurawall`, `POST /v1/events` (to be built on the NEXORA side, contract in `docs/nexora.md`) | org API key, `neurawall:link` | no inbound connection; redirects never followed; 64 KB response cap |
 | Clerk | JWKS verification only | JWT template must add `email_verified`, `org_id`, `aud` | no Clerk secret key is used or stored |
 | Anthropic | official SDK, own key (Pro) | none | usage metered per UTC month |
-| Customer webhooks (Slack, Teams, PagerDuty, SIEM) | their incoming-webhook URLs | none | SSRF-safe, signed |
+| Customer webhooks (any receiver; Slack and Teams work via the `text` field) | their incoming-webhook URLs | none | SSRF-safe, signed |
 
 ## Security checklist
 

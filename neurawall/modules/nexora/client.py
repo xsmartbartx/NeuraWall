@@ -15,6 +15,7 @@ Wire contract (what NEXORA's API must serve; see replica/architecture.md, N1 and
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -83,6 +84,7 @@ class NexoraClient:
             or not isinstance(plan_id, str)
             or isinstance(end, bool)
             or not (end is None or isinstance(end, int | float))
+            or (end is not None and not math.isfinite(end))
         ):
             raise NexoraError("NEXORA sent an unreadable entitlement")
         return Entitlement(org_id=org_id, plan_id=plan_id, current_period_end=end)

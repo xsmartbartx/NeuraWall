@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 - Linked mode (optional): an installation can belong to one NEXORA organisation. The plan is pulled from
-  NEXORA, usage events (counts only) go back through a durable outbox, and a plan change never changes
+  NEXORA, usage events (counts only) go back through an outbox (queued in memory, persisted within about 15 s, retried; a crash can lose the last few seconds), and a plan change never changes
   what nodes enforce. See [docs/nexora.md](docs/nexora.md).
 - Just-in-time users: with `auth.sso_jit`, a verified member of the required organisation signs in without
   an admin creating the account first. They start as viewers; roles never come from the identity provider.

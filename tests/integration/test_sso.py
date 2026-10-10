@@ -264,9 +264,8 @@ def test_jit_never_takes_a_role_from_the_token(tmp_path):
 def test_jit_refuses_unverified_or_outside_identities(tmp_path, claims):
     with jit_client(tmp_path) as c:
         assert sso_login(c, member(**claims)).status_code == 403
-    with jit_client(tmp_path / "again") as c:
         users = c.get("/api/v1/users", headers=admin_headers(c)).json()
-        assert [u["email"] for u in users] == [ADMIN[0]]
+        assert [u["email"] for u in users] == [ADMIN[0]]  # the refusal created nobody
 
 
 def test_jit_needs_the_verified_claim_to_be_present(tmp_path):
@@ -383,3 +382,36 @@ def test_last_login_is_saved_for_password_and_sso_sign_in(client):
     time.sleep(0.01)
     assert sso_login(client, make_token(email=ADMIN[0])).status_code == 200
     assert client.get("/api/v1/users", headers=admin).json()[0]["last_login"] > first
+
+
+def _external_id(c, email):
+    from neurawall.services.control_plane import db
+
+    with c.app.state.cp.db.session() as s:
+        return s.query(db.User).filter_by(email=email).one().external_id
+
+
+def test_an_unverified_token_cannot_claim_an_existing_account_in_strict_mode(tmp_path):
+    with jit_client(tmp_path) as c:
+        assert (
+            sso_login(c, member(sub="user_x", email=ADMIN[0], email_verified=False)).status_code
+            == 403
+        )
+        assert _external_id(c, ADMIN[0]) is None  # nothing was bound
+        # The real owner, with a verified email, is not locked out.
+        assert sso_login(c, member(sub="user_owner", email=ADMIN[0])).status_code == 200
+        assert _external_id(c, ADMIN[0]) == "user_owner"
+
+
+def test_without_jit_an_unverified_token_signs_in_but_never_binds(client):
+    """Existing behaviour is kept (the identity provider must verify emails), but only a
+    verified email may bind the provider id to the account."""
+    assert sso_login(client, make_token(sub="user_x", email=ADMIN[0])).status_code == 200
+    assert _external_id(client, ADMIN[0]) is None
+    assert (
+        sso_login(
+            client, make_token(sub="user_ok", email=ADMIN[0], email_verified=True)
+        ).status_code
+        == 200
+    )
+    assert _external_id(client, ADMIN[0]) == "user_ok"

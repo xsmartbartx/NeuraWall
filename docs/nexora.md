@@ -33,7 +33,7 @@ events are waiting to be sent, and a **Sync now** button (six presses per hour).
 * **A plan change never changes what the firewall enforces.** Enrolled nodes keep their last signed
   bundle and keep sending flows. A downgrade only stops *new* nodes being enrolled, turns the Claude
   advisor off where the plan has none, and shortens flow retention at the next purge.
-* Usage events wait in a durable outbox (retried with backoff, up to an hour apart, at most 50,000 kept).
+* Usage events are queued in memory and written to a database outbox within about 15 seconds. From there they survive restarts and are retried with backoff (up to an hour apart, at most 50,000 kept). Events still in memory when the process crashes are lost, so counts can be short by a few seconds' worth.
 
 ## What is sent to NEXORA
 

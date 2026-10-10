@@ -345,7 +345,13 @@ class ControlPlane:
                 if user is not None:
                     if user.external_id is not None:
                         raise denied  # that email belongs to a different provider identity
-                    user.external_id = identity.subject
+                    if auth.sso_jit and not identity.email_verified:
+                        raise denied  # strict mode: an unverified email proves nothing
+                    # Bind the provider id only when the email is verified. A token that does
+                    # not say so still signs in as before (the identity provider is required
+                    # to verify emails) but cannot claim the account for its own subject.
+                    if identity.email_verified:
+                        user.external_id = identity.subject
                 elif auth.sso_jit and identity.email_verified and identity.org_id:
                     user = db.User(
                         email=identity.email,

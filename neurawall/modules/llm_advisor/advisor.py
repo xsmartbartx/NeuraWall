@@ -75,6 +75,10 @@ class LlmAdvisor:
         #: Entitlement gate (e.g. the subscription plan). False = offline advisor only.
         self.allowed = allowed
         #: Plan budget (e.g. calls per month). False = offline advisor until it resets.
+        #: The check and the usage row (written after the call returns) are not atomic, so
+        #: calls already in flight can overshoot the budget by at most the number of concurrent
+        #: callers (the tier3 worker plus request handlers). That is accepted: serialising the
+        #: model calls behind a lock would stall triage for seconds at a time.
         self.within_budget = within_budget
         #: Metering hook, called once per call that reached the model.
         self.on_call = on_call

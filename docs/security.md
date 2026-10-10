@@ -93,18 +93,21 @@ Off by default. Setting `NEURAWALL_AUTH__SSO_JWKS_URL` enables
 What it does and does not do:
 
 - Clerk only proves identity. The token is verified (RS256 signature against the
-  JWKS, expiry, and `iss` when `SSO_ISSUER` is set) and its `email` claim is
-  mapped to an **existing, active** NeuraWall user, who signs in with **their own
-  NeuraWall role**. Roles, deactivation and the four-eyes approval rule are
-  unchanged and still live in NeuraWall.
-- It never creates users and never takes a role from the identity provider. An
+  JWKS, expiry, and `iss` when `SSO_ISSUER` is set). The user is found by the
+  provider's user id (`sub`) first, then by the token's `email` among existing,
+  active users. That user signs in with **their own NeuraWall role**. Roles,
+  deactivation and the four-eyes approval rule are unchanged and still live in
+  NeuraWall. An email match binds the provider id to the account only when the token
+  says `email_verified: true`.
+- By default it never creates users (see [Just-in-time users](#just-in-time-users)
+  for the opt-in) and it never takes a role from the identity provider. An
   unknown or deactivated email is refused.
 - Set `NEURAWALL_AUTH__SSO_REQUIRED_ORG_ID` to accept only members of one Clerk
   organisation. The Clerk instance must require verified email addresses.
 - Every refusal returns the same generic 403 so a caller cannot tell which check
   failed; the endpoint shares the login IP rate limit; each success is audited as
   `auth.login.sso`.
-- Password login is unaffected and remains available.
+- Password login remains available unless `NEURAWALL_AUTH__LOCAL_LOGIN=admin_only` (see below).
 
 ### "Sign in with NEXORA" on the console login page
 
@@ -126,7 +129,8 @@ promotes the user on the Users page.
 - Refused at startup unless `SSO_JWKS_URL` and `SSO_REQUIRED_ORG_ID` are set: without an
   organisation any identity-provider user would get an account.
 - The token must carry `email_verified: true` (add it to the Clerk JWT template). Anything else,
-  including the string `"true"`, is refused.
+  including the string `"true"`, is refused. With JIT on this also applies to signing in as an
+  existing user by email: an unverified token is refused rather than linked.
 - A role is never read from the token. Users are matched by the provider's user id, so a changed
   email does not create a second account. An existing user with the same email is linked on their
   first SSO sign-in; if that email is already linked to a different identity, sign-in is refused.

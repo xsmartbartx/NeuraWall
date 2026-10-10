@@ -31,7 +31,7 @@ Image: a real screenshot of the Alerts to Approvals flow from the demo instance 
 - **Works on encrypted traffic without decrypting it.** Flow metadata, TLS fingerprints, DNS behaviour. *(Page "What we detect without decrypting": to be written, fix #2.)*
 - **Tamper-evident history.** A hash-chained audit trail you can verify, and signed bundles nodes check themselves.
 - **Keeps enforcing when the control plane is gone.** Nodes run their last signed bundle.
-- **Alerts where your team already is.** Signed webhooks to Slack, Teams, PagerDuty or your SIEM, and CSV export.
+- **Alerts where your team already is.** Signed JSON webhooks (the body has a `text` field that Slack and Teams incoming webhooks accept; for PagerDuty or a SIEM, point it at their generic HTTP receiver), and CSV export.
 - **Sign in with your NEXORA account**, or keep local accounts.
 
 Not claimed: a "detection rate", a "false-positive rate", or "blocks X% of attacks". There is no independent measurement to cite yet (fix #1 is a published evasion report).

@@ -50,7 +50,7 @@ export function Integrations() {
       <NexoraCard />
       <Card pad={false} title="Webhooks">
         {error ? <ErrorBox error={error} /> : !channels ? <Loading /> : channels.length === 0 ? (
-          <Empty>No webhooks yet. Add one to post new alerts and pending approvals to Slack, Teams, PagerDuty or your SIEM.</Empty>
+          <Empty>No webhooks yet. Add one to send new alerts and pending approvals as signed JSON to Slack, Teams or any receiver that accepts a webhook.</Empty>
         ) : (
           <div className="table-wrap"><table>
             <thead><tr><th>Name</th><th>Sends to</th><th>When</th><th>Last delivery</th><th>State</th><th></th></tr></thead>

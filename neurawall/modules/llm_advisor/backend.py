@@ -102,6 +102,13 @@ class ClaudeBackend:
         except anthropic.APIStatusError as exc:
             raise RecoverableError(f"Claude API error {exc.status_code}") from exc
 
+        # The API has billed these tokens whatever the outcome below, so record them now.
+        usage = response.usage
+        cached = (getattr(usage, "cache_read_input_tokens", 0) or 0) + (
+            getattr(usage, "cache_creation_input_tokens", 0) or 0
+        )
+        self._usage.value = (response.model, usage.input_tokens + cached, usage.output_tokens)
+
         if response.stop_reason == "refusal":
             raise RecoverableError("Claude declined the request")
         if response.stop_reason == "max_tokens":
@@ -109,11 +116,6 @@ class ClaudeBackend:
         parsed = response.parsed_output
         if parsed is None:
             raise RecoverableError("Claude returned no structured output")
-        self._usage.value = (
-            response.model,
-            response.usage.input_tokens,
-            response.usage.output_tokens,
-        )
         log.info(
             "tier3 call",
             model=response.model,
