@@ -34,7 +34,7 @@ export function Users() {
             <tbody>
               {data.map((u) => (
                 <tr key={u.id}>
-                  <td><div>{u.name || u.email}</div><div className="faint">{u.email}</div></td>
+                  <td><div>{u.name || u.email} {u.auth_provider === "nexora" && <Badge kind="info">NEXORA</Badge>}</div><div className="faint">{u.email}</div></td>
                   <td>
                     <select value={u.role} disabled={busy || u.id === me?.id} onChange={(e) => patch(u, { role: e.target.value })} aria-label={`Role for ${u.email}`}>
                       {ROLES.map(([r]) => <option key={r} value={r}>{r}</option>)}
@@ -44,10 +44,10 @@ export function Users() {
                   <td className="muted">{ago(u.last_login)}</td>
                   <td className="row" style={{ flexWrap: "nowrap" }}>
                     {u.id !== me?.id && <button className="small" disabled={busy} onClick={() => patch(u, { active: !u.active })}>{u.active ? "Disable" : "Enable"}</button>}
-                    <button className="small" disabled={busy} onClick={async () => {
+                    {u.auth_provider === "local" && <button className="small" disabled={busy} onClick={async () => {
                       const r = await run(() => api<{ temporary_password: string }>(`/users/${u.id}/reset-password`, { method: "POST" }));
                       if (r) { setTemp({ email: u.email, password: r.temporary_password }); reload(); }
-                    }}>Reset password</button>
+                    }}>Reset password</button>}
                   </td>
                 </tr>
               ))}

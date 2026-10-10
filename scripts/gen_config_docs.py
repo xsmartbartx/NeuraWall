@@ -90,7 +90,8 @@ def main() -> None:
     ]
     for section, cls in [("inference", config.InferenceSettings), ("llm", config.LlmSettings),
                          ("policy", config.PolicySettings), ("auth", config.AuthSettings),
-                         ("billing", config.BillingSettings)]:
+                         ("billing", config.BillingSettings),
+                         ("nexora", config.NexoraSettings)]:
         parts += ["", f"## `{section}`", "", "| Key | Environment | Type | Default | Description |",
                   "|---|---|---|---|---|", *rows(cls, f"{section}.", f"NEURAWALL_{section.upper()}__")]
     parts += ["", "## Production requirements", "",

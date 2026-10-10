@@ -14,7 +14,15 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from neurawall.core.errors import ValidationFailure
@@ -97,6 +105,11 @@ class BillingSettings(_Section):
     price_business_year: str | None = None
     price_enterprise_month: str | None = None
     price_enterprise_year: str | None = None
+    #: Claude calls per UTC month included with Business. Over it, the offline advisor answers
+    #: until the month ends. Placeholder until the plan limits are decided.
+    llm_calls_business: int = Field(3000, ge=0)
+    #: Claude calls per UTC month included with Enterprise.
+    llm_calls_enterprise: int = Field(15000, ge=0)
 
     @field_validator("*", mode="before")
     @classmethod
@@ -107,6 +120,12 @@ class BillingSettings(_Section):
     @property
     def self_serve_enabled(self) -> bool:
         return self.stripe_secret_key is not None and self.stripe_webhook_secret is not None
+
+    def llm_monthly_calls(self, plan: str) -> int | None:
+        """The call budget of an `included` plan; None = no budget to enforce."""
+        return {"business": self.llm_calls_business, "enterprise": self.llm_calls_enterprise}.get(
+            plan
+        )
 
     def price_id(self, plan: str, interval: str) -> str | None:
         value = getattr(self, f"price_{plan}_{interval}", None)
@@ -148,6 +167,73 @@ class AuthSettings(_Section):
     #: If set, the token must carry this Clerk organisation id (`org_id`), so only members
     #: of one organisation can use SSO.
     sso_required_org_id: str | None = None
+    #: Create a `viewer` on the first SSO sign-in of a verified member of `sso_required_org_id`
+    #: (the token must carry `email_verified: true`). Off by default: SSO then only signs in
+    #: existing users. A role is never taken from the identity provider; admins promote users.
+    sso_jit: bool = False
+    #: Lifetime of an SSO session. Unset = `access_token_ttl_seconds`, or one hour when `sso_jit`
+    #: is on (removing someone from the organisation then takes effect within the hour).
+    sso_session_ttl_seconds: int | None = Field(None, ge=60)
+    #: `enabled` = anyone with a password may use it. `admin_only` = password sign-in is kept
+    #: for admins (break-glass); everyone else uses SSO.
+    local_login: Literal["enabled", "admin_only"] = "enabled"
+    #: Public "Try the demo" sign-in as a read-only viewer, for a *separate demo instance* with
+    #: synthetic traffic. Refused at startup unless `demo_mode` is on, and on any instance that
+    #: is linked to NEXORA, has Stripe keys or a Claude API key.
+    demo_public_login: bool = False
+
+    @model_validator(mode="after")
+    def _jit_needs_an_organisation(self) -> AuthSettings:
+        if self.sso_jit and not (self.sso_jwks_url and self.sso_required_org_id):
+            raise ValueError(
+                "auth.sso_jit needs auth.sso_jwks_url and auth.sso_required_org_id: "
+                "without an organisation any identity-provider user would get an account"
+            )
+        return self
+
+    @property
+    def sso_ttl_seconds(self) -> int:
+        if self.sso_session_ttl_seconds is not None:
+            return self.sso_session_ttl_seconds
+        return 3600 if self.sso_jit else self.access_token_ttl_seconds
+
+
+class NexoraSettings(_Section):
+    """Linked mode: this installation belongs to one NEXORA organisation. Off unless an API
+    key is set. The plan then comes from NEXORA instead of a licence or a local Stripe
+    subscription, and usage events flow back."""
+
+    #: NEXORA API base URL. Must be https (http only for localhost, in tests).
+    api_url: str = "https://api.onenexora.com"
+    #: An organisation API key (`nx_live_…`) allowed to read this organisation's NeuraWall
+    #: entitlement and write usage events. Empty = standalone installation.
+    api_key: SecretStr | None = None
+    #: Where "manage your plan" sends people (the NEXORA console).
+    console_url: str = "https://console.onenexora.com"
+    #: How often the plan is re-read.
+    sync_interval_seconds: int = Field(3600, ge=60)
+    #: Send usage events (counts only: no addresses, no emails, no flow data).
+    events_enabled: bool = True
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _empty_is_unset(cls, v: Any, info: ValidationInfo) -> Any:
+        # Compose passes unset variables as "", which must mean "use the default".
+        if isinstance(v, str) and not v.strip():
+            return cls.model_fields[info.field_name or ""].get_default()
+        return v
+
+    @field_validator("api_url", "console_url")
+    @classmethod
+    def _https(cls, v: str) -> str:
+        host = v.split("://", 1)[-1].split("/", 1)[0].split(":", 1)[0]
+        if not (v.startswith("https://") or (v.startswith("http://") and host == "localhost")):
+            raise ValueError("must be an https:// URL")
+        return v.rstrip("/")
+
+    @property
+    def linked(self) -> bool:
+        return self.api_key is not None
 
 
 class Settings(BaseSettings):
@@ -185,6 +271,7 @@ class Settings(BaseSettings):
     policy: PolicySettings = PolicySettings()
     auth: AuthSettings = AuthSettings()
     billing: BillingSettings = BillingSettings()
+    nexora: NexoraSettings = NexoraSettings()
 
     @classmethod
     def settings_customise_sources(
@@ -202,6 +289,16 @@ class Settings(BaseSettings):
     def _production_guards(self) -> Settings:
         if self.inference.t3_ambiguous_low > self.inference.t3_ambiguous_high:
             raise ValueError("inference.t3_ambiguous_low must be <= t3_ambiguous_high")
+        if self.auth.demo_public_login:
+            if not self.demo_mode:
+                raise ValueError("auth.demo_public_login needs demo_mode (synthetic traffic only)")
+            if self.nexora.linked or self.billing.stripe_secret_key is not None:
+                raise ValueError(
+                    "auth.demo_public_login must not run on an installation that is linked to "
+                    "NEXORA or has billing keys: use a separate demo instance"
+                )
+            if self.anthropic_api_key:
+                raise ValueError("auth.demo_public_login must run with the offline advisor")
         if self.environment == "production" and self.auth.secret_key is None:
             raise ValueError(
                 "auth.secret_key (NEURAWALL_AUTH__SECRET_KEY) is required in production"

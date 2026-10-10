@@ -7,16 +7,18 @@ import { useAction, useApi, useAuth, useToast } from "../lib/hooks";
 
 interface PlanInfo {
   id: string; name: string; nodes_limit: number | null; retention_days: number | null;
-  llm_advisor_allowed: boolean; support: string; self_serve: boolean;
+  llm_advisor_allowed: boolean; llm_access: "none" | "own_key" | "included"; support: string; self_serve: boolean;
   price_cents_month: number; price_cents_year: number;
   purchasable?: { month: boolean; year: boolean };
 }
 
 interface BillingStatus {
   plan: PlanInfo;
-  source: "stripe" | "licence";
+  source: "stripe" | "nexora" | "licence";
+  linked: boolean;
+  manage_url: string | null;
   subscription: { status: string; current_period_end: number | null; manageable: boolean } | null;
-  usage: { nodes: number; retention_days: number };
+  usage: { nodes: number; retention_days: number; llm_calls: number; llm_budget: number | null };
   self_serve: boolean;
   plans: PlanInfo[];
 }
@@ -58,10 +60,10 @@ export function Billing() {
 
   return (
     <>
-      <PageHead title="Billing" desc="Your NeuraWall plan, what it includes and how much of it you use. Payments are handled by Stripe." />
+      <PageHead title="Billing" desc={`Your NeuraWall plan, what it includes and how much of it you use. ${b.linked ? "This installation belongs to a NEXORA organisation, so the plan is managed there." : "Payments are handled by Stripe."}`} />
       <div className="grid halves">
         <Card title={<div className="row"><h2>Current plan</h2><Badge kind="active">{plan.name}</Badge>
-          <span className="faint">{b.source === "stripe" ? "via Stripe" : "licence"}</span></div>}>
+          <span className="faint">{b.source === "stripe" ? "via Stripe" : b.source === "nexora" ? "via NEXORA" : "licence"}</span></div>}>
           <dl className="kv">
             <dt>Enforcement nodes</dt>
             <dd>
@@ -71,14 +73,33 @@ export function Billing() {
               </div>
             </dd>
             <dt>Flow retention</dt><dd className="mono">{usage.retention_days} days</dd>
-            <dt>Claude AI advisor</dt><dd>{plan.llm_advisor_allowed ? "Included" : "Offline advisor only"}</dd>
+            <dt>Claude AI advisor</dt>
+            <dd>
+              {plan.llm_access === "none" && "Offline advisor only"}
+              {plan.llm_access === "own_key" && <>Your own Anthropic key <span className="faint">(billed by Anthropic; {usage.llm_calls.toLocaleString()} calls this month)</span></>}
+              {plan.llm_access === "included" && usage.llm_budget !== null && (
+                <div className="row" style={{ flexWrap: "nowrap" }}>
+                  <div style={{ flex: 1, minWidth: 120 }}><Meter value={usage.llm_calls / usage.llm_budget} warn={usage.llm_calls >= usage.llm_budget} /></div>
+                  <span className="mono">{usage.llm_calls.toLocaleString()} / {usage.llm_budget.toLocaleString()} calls this month</span>
+                </div>
+              )}
+              {plan.llm_access === "included" && usage.llm_budget !== null && usage.llm_calls >= usage.llm_budget && (
+                <div className="faint">Budget used. The offline advisor answers until the month ends (UTC).</div>
+              )}
+            </dd>
             <dt>Support</dt><dd>{plan.support}</dd>
             {b.subscription && <>
               <dt>Subscription</dt><dd><Badge kind={b.subscription.status === "active" ? "active" : "revoked"}>{b.subscription.status}</Badge></dd>
               <dt>Renews</dt><dd>{dateTime(b.subscription.current_period_end)}</dd>
             </>}
           </dl>
-          {admin && b.subscription?.manageable && (
+          {b.linked && b.manage_url && (
+            <div className="row" style={{ marginTop: 14 }}>
+              <a className="btn" href={b.manage_url} target="_blank" rel="noopener noreferrer">Manage plan in NEXORA</a>
+              <span className="faint">Plan changes, cards and invoices live in your NEXORA organisation.</span>
+            </div>
+          )}
+          {admin && b.subscription?.manageable && !b.linked && (
             <div className="row" style={{ marginTop: 14 }}>
               <button disabled={busy} onClick={portal}>Manage subscription</button>
               <span className="faint">Change plan, update your card, download invoices or cancel.</span>
@@ -92,7 +113,7 @@ export function Billing() {
             <li>A failed renewal keeps your plan while Stripe retries the payment.</li>
             <li>Yearly billing gives two months free.</li>
           </ul>
-          {!b.self_serve && <div className="callout" style={{ marginTop: 12 }}>Self-serve checkout isn't enabled on this installation. Contact <a href={`${SALES}NeuraWall%20licence`}>sales</a> for a licence.</div>}
+          {!b.self_serve && !b.linked && <div className="callout" style={{ marginTop: 12 }}>Self-serve checkout isn't enabled on this installation. Contact <a href={`${SALES}NeuraWall%20licence`}>sales</a> for a licence.</div>}
           {!admin && <div className="callout" style={{ marginTop: 12 }}>Only administrators can change the plan.</div>}
         </Card>
       </div>
@@ -110,7 +131,7 @@ export function Billing() {
           const price = p.id === "enterprise_dedicated" ? "$5,000–15,000"
             : interval === "year" && p.price_cents_year ? usd(p.price_cents_year) : usd(p.price_cents_month);
           const per = p.id === "enterprise_dedicated" || interval === "month" || !p.price_cents_year ? "/ month" : "/ year";
-          const canBuy = admin && p.purchasable?.[interval] && !current;
+          const canBuy = admin && !b.linked && p.purchasable?.[interval] && !current;
           return (
             <div key={p.id} className="card kpi" style={{ gap: 10, borderColor: current ? "var(--accent)" : undefined }}>
               <div className="row"><b>{p.name}</b>{current && <Badge kind="active">current</Badge>}</div>
@@ -118,11 +139,12 @@ export function Billing() {
               <ul className="list-plain" style={{ fontSize: 12.5 }}>
                 <li>{p.nodes_limit === null ? "Custom" : p.nodes_limit} enforcement node{p.nodes_limit === 1 ? "" : "s"}</li>
                 <li>{p.retention_days === null ? "Custom" : `${p.retention_days}-day`} retention</li>
-                <li>{p.llm_advisor_allowed ? "Claude AI advisor" : "Offline AI advisor"}</li>
+                <li>{p.llm_access === "included" ? "Claude AI included, monthly budget" : p.llm_access === "own_key" ? "Claude AI with your own key" : "Offline AI advisor"}</li>
                 <li>{p.support} support</li>
               </ul>
               {current ? <span className="faint">Your plan</span>
                 : canBuy ? <button className="primary" disabled={busy} onClick={() => checkout(p.id)}>Upgrade to {p.name}</button>
+                : b.linked && b.manage_url && p.price_cents_month > 0 && p.self_serve ? <a className="btn" href={b.manage_url} target="_blank" rel="noopener noreferrer">Change in NEXORA</a>
                 : p.price_cents_month > 0 ? <a className="btn" href={`${SALES}${encodeURIComponent(`NeuraWall ${p.name}`)}`}>Contact sales</a>
                 : null}
             </div>

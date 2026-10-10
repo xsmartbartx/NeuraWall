@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any, TypeVar, cast
 
 import anthropic
@@ -63,6 +64,7 @@ class ClaudeBackend:
         self.max_tokens = max_tokens
         self.effort = effort
         self.server_side_fallbacks = server_side_fallbacks
+        self._usage = threading.local()
         self._client = anthropic.Anthropic(
             api_key=api_key,
             timeout=timeout_seconds,
@@ -70,7 +72,12 @@ class ClaudeBackend:
             default_headers={"anthropic-workspace-id": workspace_id} if workspace_id else None,
         )
 
+    def last_usage(self) -> tuple[str, int, int]:
+        """(model, input tokens, output tokens) of this thread's latest call."""
+        return getattr(self._usage, "value", (self.model, 0, 0))  # type: ignore[no-any-return]
+
     def generate(self, task: str, context: str, output: type[T]) -> T:
+        self._usage.value = (self.model, 0, 0)
         kwargs: dict[str, object] = {}
         if self.server_side_fallbacks:
             kwargs["betas"] = ["server-side-fallback-2026-07-01"]
@@ -102,6 +109,11 @@ class ClaudeBackend:
         parsed = response.parsed_output
         if parsed is None:
             raise RecoverableError("Claude returned no structured output")
+        self._usage.value = (
+            response.model,
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+        )
         log.info(
             "tier3 call",
             model=response.model,

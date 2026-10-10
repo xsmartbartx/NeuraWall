@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Card, Drawer, Empty, ErrorBox, Labels, Loading, PageHead, Pager } from "../components/ui";
+import { ExportButton } from "../components/controls";
 import { api, type FlowDetail, type FlowSummary, type Page } from "../lib/api";
 import { bytes, dateTime, human } from "../lib/format";
 import { useAction, useApi, useAuth } from "../lib/hooks";
@@ -46,6 +47,9 @@ export function Flows() {
   qs.set("limit", String(LIMIT));
   if (!qs.get("hours")) qs.set("hours", "24");
   const { data, error } = useApi<Page<FlowSummary>>(`/flows?${qs}`, { poll: 15000 });
+  const exportQs = new URLSearchParams(qs);
+  exportQs.delete("limit");
+  exportQs.delete("offset");
 
   const set = (k: string, v: string) => {
     const next = new URLSearchParams(params);
@@ -57,7 +61,8 @@ export function Flows() {
 
   return (
     <>
-      <PageHead title="Flow explorer" desc="Every analysed flow with its Tier 1 score, Tier 2 labels and the policy verdict. Metadata only — payloads are never stored." />
+      <PageHead title="Flow explorer" desc="Every analysed flow with its Tier 1 score, Tier 2 labels and the policy verdict. Metadata only — payloads are never stored."
+        actions={<ExportButton path={`/flows/export.csv?${exportQs}`} filename="flows.csv" />} />
       <Card pad={false} title={
         <form className="row" onSubmit={submit} style={{ flex: 1 }}>
           <input placeholder="IP, host or flow id" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 240 }} aria-label="Search" />

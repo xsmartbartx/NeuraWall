@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Literal
 
 
 class PlanId(StrEnum):
@@ -30,6 +31,10 @@ class Plan:
     nodes_limit: int | None
     retention_days: int | None
     llm_advisor_allowed: bool
+    #: Where Claude comes from: `none` (offline advisor only), `own_key` (the customer's own
+    #: Anthropic key, billed by Anthropic, so no call budget here) or `included` (a monthly
+    #: call budget; see `BillingSettings.llm_monthly_calls`).
+    llm_access: Literal["none", "own_key", "included"]
     support: str
     #: Self-serve through Stripe Checkout. Dedicated is quoted and licensed by sales.
     self_serve: bool
@@ -46,6 +51,7 @@ PLANS: dict[PlanId, Plan] = {
         nodes_limit=1,
         retention_days=7,
         llm_advisor_allowed=False,
+        llm_access="none",
         support="Community",
         self_serve=False,
         price_cents_month=0,
@@ -57,6 +63,7 @@ PLANS: dict[PlanId, Plan] = {
         nodes_limit=5,
         retention_days=7,
         llm_advisor_allowed=True,
+        llm_access="own_key",
         support="Email, 2 business days",
         self_serve=True,
         price_cents_month=14900,
@@ -68,6 +75,7 @@ PLANS: dict[PlanId, Plan] = {
         nodes_limit=25,
         retention_days=30,
         llm_advisor_allowed=True,
+        llm_access="included",
         support="Priority, 1 business day",
         self_serve=True,
         price_cents_month=49900,
@@ -79,6 +87,7 @@ PLANS: dict[PlanId, Plan] = {
         nodes_limit=100,
         retention_days=90,
         llm_advisor_allowed=True,
+        llm_access="included",
         support="SLA, priority",
         self_serve=True,
         price_cents_month=300000,
@@ -90,6 +99,7 @@ PLANS: dict[PlanId, Plan] = {
         nodes_limit=None,
         retention_days=None,
         llm_advisor_allowed=True,
+        llm_access="own_key",
         support="SLA + onboarding",
         self_serve=False,
         price_cents_month=500000,

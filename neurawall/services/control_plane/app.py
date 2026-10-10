@@ -92,6 +92,8 @@ def create_app(
     app.state.login_limiter = KeyedRateLimiter(
         settings.auth.login_rate_per_minute / 60, burst=settings.auth.login_rate_per_minute
     )
+    # Public guest sign-in: 20 per hour per address, so it cannot be used to churn sessions.
+    app.state.demo_limiter = KeyedRateLimiter(rate_per_second=20 / 3600, burst=5)
     api_limiter = KeyedRateLimiter(rate_per_second=50, burst=200)
 
     if settings.cors_origins:

@@ -106,9 +106,6 @@ What it does and does not do:
   `auth.login.sso`.
 - Password login is unaffected and remains available.
 
-The console has no SSO button yet; a front end obtains a Clerk session token and
-calls this endpoint.
-
 ### "Sign in with NEXORA" on the console login page
 
 Set `NEURAWALL_AUTH__SSO_LOGIN_URL` (in addition to `SSO_JWKS_URL`) and the login page shows a
@@ -119,3 +116,57 @@ calling the server. The fragment is removed from the address bar immediately.
 
 Also set `NEURAWALL_AUTH__SSO_AUDIENCE` so a Clerk token minted for another service is refused. The
 token comes from a dedicated short-lived Clerk JWT template that sets that audience.
+
+### Just-in-time users
+
+Set `NEURAWALL_AUTH__SSO_JIT=true` to let a verified member of your NEXORA organisation sign in
+without an admin creating the account first. The first sign-in creates a **viewer**; an admin
+promotes the user on the Users page.
+
+- Refused at startup unless `SSO_JWKS_URL` and `SSO_REQUIRED_ORG_ID` are set: without an
+  organisation any identity-provider user would get an account.
+- The token must carry `email_verified: true` (add it to the Clerk JWT template). Anything else,
+  including the string `"true"`, is refused.
+- A role is never read from the token. Users are matched by the provider's user id, so a changed
+  email does not create a second account. An existing user with the same email is linked on their
+  first SSO sign-in; if that email is already linked to a different identity, sign-in is refused.
+- Provisioned users have no usable password: password sign-in and admin password resets are refused
+  for them. Provisioning is audited (`auth.sso.provision`).
+- SSO sessions last one hour by default when `SSO_JIT` is on (`SSO_SESSION_TTL_SECONDS` to change).
+  Removing someone from the organisation stops new sign-ins at once and their session within that time.
+- `NEURAWALL_AUTH__LOCAL_LOGIN=admin_only` keeps password sign-in for admins (break-glass) and refuses it
+  for everyone else, with the same error as a wrong password.
+
+
+## Webhooks
+
+Webhooks (Integrations page) send alerts and pending approvals to a URL an administrator chose. Because
+that makes the server issue requests on someone's say-so, every send, not only the save, enforces:
+
+- `https` only, no credentials in the URL, a host *name* (not an IP literal).
+- The name is resolved and **every** address must be a public one. Loopback, private ranges, link-local
+  (including `169.254.169.254`), carrier-grade NAT, multicast, reserved and IPv4-mapped IPv6 internal
+  addresses are refused. One bad answer among good ones refuses the whole name.
+- The connection goes to the address that was checked, with the original host name for TLS, so DNS cannot
+  answer differently a moment later. A refused address is never retried.
+- No redirects, a five second timeout, a 64 KB body.
+
+Each request carries `X-NeuraWall-Timestamp` and `X-NeuraWall-Signature: sha256=HMAC(secret, "<timestamp>.<body>")`.
+The signing secret is derived from the server key and a per-channel nonce, shown once, and never stored.
+Rotating a channel changes its nonce. Rotating `auth.secret_key` changes every channel's secret.
+The URL itself can be a secret (Slack's are), so the API only ever returns its host.
+Alert messages include the source and destination addresses: send them only to receivers you trust.
+
+## CSV exports
+
+Flows, alerts and the audit trail export as CSV with the same permission as the matching list. Cells that start
+with `=`, `+`, `-`, `@`, a tab or a carriage return get a leading apostrophe so a spreadsheet does not run them
+as formulas (hostnames and alert titles come from network traffic an attacker controls). An export stops at
+50,000 rows and is itself recorded in the audit trail.
+
+## Public demo
+
+`NEURAWALL_AUTH__DEMO_PUBLIC_LOGIN=true` adds a "Try the demo" button that signs a visitor in as a read-only
+viewer for 30 minutes (20 per hour per address). It is for a **separate demo instance** and the server refuses
+to start unless `demo_mode` is on, and refuses if the instance is linked to NEXORA, has Stripe keys or a Claude
+API key. If an administrator changes the demo account's role or deactivates it, the button stops working.

@@ -2,8 +2,9 @@
 
 Clerk only proves *who someone is*. Everything NeuraWall enforces — the user
 row, its role, the four-eyes rule, deactivation — stays in NeuraWall: a verified
-identity is mapped to an existing, active user by email and signs in with that
-user's own role. Nothing here creates users or grants roles.
+identity is mapped to an existing, active user and signs in with that user's own
+role. This module only verifies the token; the control plane decides whether to
+create a user (`auth.sso_jit`) and never takes a role from the token.
 """
 
 from __future__ import annotations
@@ -26,6 +27,11 @@ _ALGORITHMS = ["RS256"]
 class SsoIdentity:
     email: str
     org_id: str | None
+    #: The identity provider's stable user id (`sub`); survives email changes.
+    subject: str
+    #: True only when the token explicitly says the email is verified.
+    email_verified: bool
+    name: str
 
 
 @lru_cache(maxsize=4)
@@ -66,8 +72,8 @@ def verify_sso_token(
         raise denied from exc
 
     email = payload.get("email")
-    if not isinstance(email, str) or not email.strip():
-        raise denied
+    if not isinstance(email, str) or not email.strip() or len(email) > 254:
+        raise denied  # 254 is the users.email column; refuse rather than fail on insert
 
     raw_nested = payload.get("o")
     nested: dict[str, Any] = raw_nested if isinstance(raw_nested, dict) else {}
@@ -75,4 +81,14 @@ def verify_sso_token(
     if required_org_id and org_id != required_org_id:
         raise denied
 
-    return SsoIdentity(email=email.strip().lower(), org_id=str(org_id) if org_id else None)
+    subject = str(payload["sub"])
+    if len(subject) > 64:
+        raise denied  # stored in a 64 character column: refuse rather than truncate into a collision
+    raw_name = payload.get("name")
+    return SsoIdentity(
+        email=email.strip().lower(),
+        org_id=str(org_id) if org_id else None,
+        subject=subject,
+        email_verified=payload.get("email_verified") is True,
+        name=raw_name.strip()[:120] if isinstance(raw_name, str) else "",
+    )

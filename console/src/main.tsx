@@ -11,6 +11,7 @@ import { Billing } from "./pages/Billing";
 import { Bundles } from "./pages/Bundles";
 import { Fleet } from "./pages/Fleet";
 import { Flows } from "./pages/Flows";
+import { Integrations } from "./pages/Integrations";
 import { ForcePasswordChange, Login } from "./pages/Login";
 import { Overview } from "./pages/Overview";
 import { Rules } from "./pages/Rules";
@@ -42,6 +43,7 @@ function App() {
         <Route path="audit" element={<Audit />} />
         <Route path="users" element={<Users />} />
         <Route path="billing" element={<Billing />} />
+        <Route path="integrations" element={<Integrations />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

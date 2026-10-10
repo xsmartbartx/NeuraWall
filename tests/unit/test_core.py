@@ -91,6 +91,13 @@ def test_redaction():
     }
     assert "abc123" not in redact_text("GET /login?token=abc123 HTTP/1.1")
     assert "sk-ant-" not in redact_text("key sk-ant-api03-abcdefghijklmnop")
+    for key in (
+        "nx_live_abcdef123456",
+        "nwk_Zm9vYmFyYmF6",
+        "nwe_Zm9vYmFyYmF6",
+        "whsec_0123456789abcdef",
+    ):
+        assert key not in redact_text(f"call failed for {key} at 12:00")
     assert redact({"nested": {"password": "x"}})["nested"]["password"] == "[REDACTED]"
 
 

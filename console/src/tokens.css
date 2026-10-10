@@ -1,0 +1,59 @@
+/* Design tokens: roles measured in replica/design/tokens*.json; every text pair passes WCAG AA (contrast.py). */
+:root,
+:root[data-theme="dark"] {
+  --bg: #0b1016;
+  --bg-raised: #111821;
+  --bg-sunken: #080c11;
+  --bg-hover: #16202b;
+  --border: #1e2a36;
+  --border-input: #4c6781;
+  --border-strong: #2b3a49;
+  --text: #dbe4ec;
+  --text-muted: #8597a8;
+  --text-faint: #75889a;
+  --accent: #3ddc97;
+  --accent-ink: #062116;
+  --allow: #3ddc97;
+  --alert: #f5b544;
+  --block: #ff5d6c;
+  --quarantine: #ff7ad9;
+  --ai: #a78bfa;
+  --info: #5cb8ff;
+  --sev-low: #5cb8ff;
+  --sev-medium: #f5b544;
+  --sev-high: #ff8a4c;
+  --sev-critical: #ff5d6c;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --radius: 8px;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f6f8;
+  --bg-raised: #ffffff;
+  --bg-sunken: #eaeef2;
+  --bg-hover: #eef2f6;
+  --border: #dbe2e9;
+  --border-input: #708aa5;
+  --border-strong: #c3ced9;
+  --text: #15202b;
+  --text-muted: #516272;
+  --text-faint: #5e6c7a;
+  --accent: #0c7e52;
+  --accent-ink: #ffffff;
+  --allow: #0c7e52;
+  --alert: #966319;
+  --block: #d02a3f;
+  --quarantine: #b83294;
+  --ai: #6d4fd8;
+  --info: #1c70bf;
+  --sev-low: #1c70bf;
+  --sev-medium: #966319;
+  --sev-high: #b25218;
+  --sev-critical: #d02a3f;
+  --shadow: 0 10px 30px rgba(20, 32, 43, 0.14);
+  color-scheme: light;
+}
+

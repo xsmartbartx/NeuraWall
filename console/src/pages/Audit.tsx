@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Card, ErrorBox, Loading, PageHead, Pager } from "../components/ui";
+import { ExportButton } from "../components/controls";
 import { api, type AuditRow, type Page } from "../lib/api";
 import { dateTime } from "../lib/format";
 import { useAction, useApi } from "../lib/hooks";
@@ -20,7 +21,7 @@ export function Audit() {
       <PageHead
         title="Audit trail"
         desc="Append-only, hash-chained record of every enforcement change, approval, bundle and sign-in. Any edit or deletion of a past entry breaks verification."
-        actions={<button disabled={busy} onClick={async () => { const r = await run(() => api<{ valid: boolean; entries?: number; error?: string }>("/audit/verify")); if (r) setVerify(r); }}>Verify chain integrity</button>}
+        actions={<><ExportButton path={`/audit/export.csv${prefix ? `?action=${encodeURIComponent(prefix)}` : ""}`} filename="audit.csv" /><button disabled={busy} onClick={async () => { const r = await run(() => api<{ valid: boolean; entries?: number; error?: string }>("/audit/verify")); if (r) setVerify(r); }}>Verify chain integrity</button></>}
       />
       {verify && (
         <div className={`callout ${verify.valid ? "" : "danger"}`} style={verify.valid ? { borderLeftColor: "var(--allow)" } : undefined}>

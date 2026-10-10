@@ -13,12 +13,14 @@ from alembic.config import Config
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Float,
     ForeignKey,
     Index,
     Integer,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
     event,
 )
@@ -36,6 +38,10 @@ def _now() -> float:
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("external_id", name="uq_users_external_id"),
+        CheckConstraint("auth_provider in ('local', 'nexora')", name="ck_users_auth_provider"),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(String(254), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(120), default="")
@@ -47,6 +53,11 @@ class User(Base):
     sessions_valid_after: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     created_at: Mapped[float] = mapped_column(Float, default=_now)
     last_login: Mapped[float | None] = mapped_column(Float, nullable=True)
+    #: The identity provider's user id, set on the first SSO sign-in. Unique when present.
+    external_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: How the account came to exist: `local` (created by an admin) or `nexora` (provisioned by
+    #: SSO; has no usable password).
+    auth_provider: Mapped[str] = mapped_column(String(12), default="local", server_default="local")
 
 
 class Node(Base):
@@ -253,3 +264,82 @@ class Database:
             raise
         finally:
             s.close()
+
+
+class LlmUsage(Base):
+    """One Tier 3 call that reached the model. Counts and token totals only: never the prompt
+    or the answer. Source of the monthly call budget."""
+
+    __tablename__ = "llm_usage"
+    __table_args__ = (
+        CheckConstraint("kind in ('triage', 'draft', 'narrate', 'explain')", name="ck_llm_kind"),
+        CheckConstraint("outcome in ('ok', 'refused', 'error')", name="ck_llm_outcome"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ts: Mapped[float] = mapped_column(Float, index=True, default=_now)
+    kind: Mapped[str] = mapped_column(String(12))
+    model: Mapped[str] = mapped_column(String(60), default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    outcome: Mapped[str] = mapped_column(String(8), default="ok")
+
+
+class CoreOutbox(Base):
+    """Events waiting to reach NEXORA (linked mode). Counts and ids only: never an address,
+    an email or any flow field. `event_id` is the idempotency key NEXORA dedupes on."""
+
+    __tablename__ = "core_outbox"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(36), unique=True)
+    event_type: Mapped[str] = mapped_column(String(60))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[float] = mapped_column(Float, default=_now)
+    sent_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_try_at: Mapped[float] = mapped_column(Float, default=_now)
+    last_error: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+class NotificationChannel(Base):
+    """A webhook the operator wants alerts and approvals sent to. The URL can itself be a
+    secret (Slack's are), so the API never returns it; the signing secret is derived from the
+    server key and `secret_nonce`, never stored."""
+
+    __tablename__ = "notification_channels"
+    __table_args__ = (
+        CheckConstraint(
+            "min_severity in ('low', 'medium', 'high', 'critical')", name="ck_channel_severity"
+        ),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    url: Mapped[str] = mapped_column(String(500))
+    secret_nonce: Mapped[str] = mapped_column(String(32))
+    events: Mapped[list[str]] = mapped_column(JSON, default=list)
+    min_severity: Mapped[str] = mapped_column(String(10), default="high")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str] = mapped_column(String(254))
+    created_at: Mapped[float] = mapped_column(Float, default=_now)
+
+
+class NotificationDelivery(Base):
+    __tablename__ = "notification_deliveries"
+    __table_args__ = (
+        UniqueConstraint("channel_id", "event_type", "ref", name="uq_delivery_once"),
+        CheckConstraint("status in ('pending', 'sent', 'dead')", name="ck_delivery_status"),
+        Index("ix_delivery_pending", "status", "next_try_at"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel_id: Mapped[int] = mapped_column(
+        ForeignKey("notification_channels.id", ondelete="CASCADE")
+    )
+    event_type: Mapped[str] = mapped_column(String(40))
+    ref: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(8), default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_try_at: Mapped[float] = mapped_column(Float, default=_now)
+    http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[float] = mapped_column(Float, default=_now)
+    sent_at: Mapped[float | None] = mapped_column(Float, nullable=True)

@@ -42,6 +42,8 @@ interface AuthCtx {
   login: (email: string, password: string) => Promise<Me>;
   /** Exchange a Clerk token (from the "Sign in with NEXORA" handoff) for a console session. */
   loginWithSso: (token: string) => Promise<Me>;
+  /** A read-only guest session; only offered by a public demo instance. */
+  loginDemo: () => Promise<Me>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -77,9 +79,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return m;
   }, []);
 
+  const loginDemo = useCallback(async () => {
+    const res = await api<{ access_token: string }>("/auth/demo", { method: "POST" });
+    setToken(res.access_token);
+    const m = await api<Me>("/auth/me");
+    setMe(m);
+    return m;
+  }, []);
+
   const can = useCallback((perm: string) => Boolean(me?.permissions.includes(perm)), [me]);
 
-  return <Auth.Provider value={{ me, ready, can, login, loginWithSso, logout, refresh }}>{children}</Auth.Provider>;
+  return <Auth.Provider value={{ me, ready, can, login, loginWithSso, loginDemo, logout, refresh }}>{children}</Auth.Provider>;
 }
 
 export function useAuth(): AuthCtx {

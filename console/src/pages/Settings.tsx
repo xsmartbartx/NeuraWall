@@ -36,12 +36,13 @@ export function Settings() {
           </Card>
           <Card title="Tier 3 advisor">
             <dl className="kv">
-              <dt>Mode</dt><dd><Badge kind={s.advisor.mode === "online" ? "llm" : s.advisor.mode === "degraded" ? "alert" : "info"} dot>{s.advisor.mode}</Badge></dd>
+              <dt>Mode</dt><dd><Badge kind={s.advisor.mode === "online" ? "llm" : s.advisor.mode === "degraded" || s.advisor.mode === "budget_reached" ? "alert" : "info"} dot>{s.advisor.mode === "budget_reached" ? "monthly budget reached" : s.advisor.mode}</Badge></dd>
               <dt>Provider</dt><dd className="mono">{s.advisor.provider}</dd>
               <dt>Model</dt><dd className="mono">{s.advisor.model ?? "offline heuristic advisor"}</dd>
               <dt>Budget left this hour</dt><dd className="mono">{s.advisor.budget_remaining}</dd>
               {s.advisor.last_error && <><dt>Last error</dt><dd style={{ color: "var(--block)" }}>{s.advisor.last_error}</dd></>}
             </dl>
+            {s.advisor.mode === "budget_reached" && <div className="callout warn" style={{ marginTop: 12 }} role="status">The plan's Claude calls for this month are used. The offline advisor answers until the month ends (UTC). See Billing.</div>}
             {s.advisor.mode === "offline" && <div className="callout ai" style={{ marginTop: 12 }}>Set <code>ANTHROPIC_API_KEY</code> on the server to enable Claude-powered triage, rule drafting and incident narration. The offline advisor keeps every workflow available without it.</div>}
           </Card>
           <Card title="Bundle signing key">
