@@ -1,0 +1,11 @@
+{
+  "_about": "Themes for firewall / network-detection tools.",
+  "request_patterns": ["\\bi wish\\b", "\\bwould be (nice|great|good|helpful)\\b", "\\bi (highly )?recommend\\b", "\\bgo compete\\b"],
+  "themes": [
+    {"id": "tls", "label": "Encrypted traffic is hard to inspect", "kind": "complaint", "patterns": ["\\bTLS 1\\.3\\b", "\\bde-?obfuscate\\b", "\\bTLS interception\\b", "\\bdecrypt"]},
+    {"id": "performance", "label": "Inspection costs throughput", "kind": "complaint", "patterns": ["\\bline speed\\b", "\\bpenalty\\b", "\\bin CPU\\b", "\\bHW acceleration\\b"]},
+    {"id": "complexity", "label": "Too complicated or expensive to run", "kind": "complaint", "patterns": ["\\btoo expensive\\b", "\\bcomplicated\\b", "\\bbear to configure\\b", "\\bunwieldy\\b", "\\bsubscriptions?\\b", "\\boverhead\\b"]},
+    {"id": "rules", "label": "Rule sprawl and consistency", "kind": "complaint", "patterns": ["\\brules\\b.{0,40}\\b(consistent|tweaked|removed|unwieldy)\\b", "\\bfirewall rules\\b"]},
+    {"id": "ai-trust", "label": "Doubt that the AI part can be trusted", "kind": "complaint", "patterns": ["\\bbypassed\\b", "\\bAI\\b.{0,60}\\b(bad|fix|prompt injection)\\b", "\\b100% confidence\\b", "\\bwhat got through\\b"]}
+  ]
+}

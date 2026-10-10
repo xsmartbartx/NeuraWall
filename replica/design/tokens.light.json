@@ -1,0 +1,182 @@
+{
+  "_about": "Light theme.",
+  "color": {
+    "bg": "#f4f6f8",
+    "bg-raised": "#ffffff",
+    "bg-sunken": "#eaeef2",
+    "bg-hover": "#eef2f6",
+    "border": "#dbe2e9",
+    "border-strong": "#c3ced9",
+    "text": "#15202b",
+    "text-muted": "#516272",
+    "text-faint": "#5e6c7a",
+    "accent": "#0c7e52",
+    "accent-ink": "#ffffff",
+    "allow": "#0c7e52",
+    "alert": "#966319",
+    "block": "#d02a3f",
+    "quarantine": "#b83294",
+    "ai": "#6d4fd8",
+    "info": "#1c70bf",
+    "sev-low": "#1c70bf",
+    "sev-medium": "#966319",
+    "sev-high": "#b25218",
+    "sev-critical": "#d02a3f",
+    "border-input": "#708aa5"
+  },
+  "pairs": [
+    [
+      "text",
+      "bg"
+    ],
+    [
+      "text",
+      "bg-raised"
+    ],
+    [
+      "text",
+      "bg-sunken"
+    ],
+    [
+      "text",
+      "bg-hover"
+    ],
+    [
+      "text-muted",
+      "bg"
+    ],
+    [
+      "text-muted",
+      "bg-raised"
+    ],
+    [
+      "text-muted",
+      "bg-sunken"
+    ],
+    [
+      "text-muted",
+      "bg-hover"
+    ],
+    [
+      "text-faint",
+      "bg-raised"
+    ],
+    [
+      "text-faint",
+      "bg-sunken"
+    ],
+    [
+      "accent-ink",
+      "accent"
+    ],
+    [
+      "accent",
+      "bg",
+      "ui"
+    ],
+    [
+      "accent",
+      "bg-raised"
+    ],
+    [
+      "allow",
+      "bg-raised"
+    ],
+    [
+      "allow",
+      "bg"
+    ],
+    [
+      "alert",
+      "bg-raised"
+    ],
+    [
+      "alert",
+      "bg"
+    ],
+    [
+      "block",
+      "bg-raised"
+    ],
+    [
+      "block",
+      "bg"
+    ],
+    [
+      "quarantine",
+      "bg-raised"
+    ],
+    [
+      "quarantine",
+      "bg"
+    ],
+    [
+      "ai",
+      "bg-raised"
+    ],
+    [
+      "ai",
+      "bg"
+    ],
+    [
+      "info",
+      "bg-raised"
+    ],
+    [
+      "info",
+      "bg"
+    ],
+    [
+      "sev-low",
+      "bg-raised"
+    ],
+    [
+      "sev-low",
+      "bg"
+    ],
+    [
+      "sev-medium",
+      "bg-raised"
+    ],
+    [
+      "sev-medium",
+      "bg"
+    ],
+    [
+      "sev-high",
+      "bg-raised"
+    ],
+    [
+      "sev-high",
+      "bg"
+    ],
+    [
+      "sev-critical",
+      "bg-raised"
+    ],
+    [
+      "sev-critical",
+      "bg"
+    ],
+    [
+      "border-input",
+      "bg",
+      "ui"
+    ],
+    [
+      "border-input",
+      "bg-raised",
+      "ui"
+    ],
+    [
+      "border-input",
+      "bg-sunken",
+      "ui"
+    ],
+    [
+      "text-faint",
+      "bg",
+      "normal"
+    ]
+  ]
+}
