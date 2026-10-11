@@ -86,11 +86,13 @@ def test_request_shape_and_structured_parse(stub):
     out = backend().generate(
         "Draft a rule.", "<untrusted_flow_data>{}</untrusted_flow_data>", schemas.LlmRuleDraft
     )
-    assert isinstance(out, schemas.LlmRuleDraft) and out.match.dst_cidrs == ["203.0.113.9/32"]
+    assert isinstance(out, schemas.LlmRuleDraft)
+    assert out.match.dst_cidrs == ["203.0.113.9/32"]
     req = stub.captured[0]
     body, headers = req["body"], {k.lower(): v for k, v in req["headers"].items()}
     assert req["path"].startswith("/v1/messages")
-    assert body["model"] == "claude-opus-5" and body["max_tokens"] == 16000
+    assert body["model"] == "claude-opus-5"
+    assert body["max_tokens"] == 16000
     assert body["thinking"] == {"type": "adaptive"}
     assert body["output_config"]["effort"] == "high"
     assert body["output_config"]["format"]["type"] == "json_schema"

@@ -76,9 +76,11 @@ def test_the_secret_is_shown_once_and_the_url_never(env):
     assert created["signing_secret"].startswith("whsec_")
     assert created["url_hint"] == "https://hooks.example.com/…"
     listing = c.get("/api/v1/notifications/channels", headers=h)
-    assert "SECRETTOKEN" not in listing.text and "signing_secret" not in listing.text
+    assert "SECRETTOKEN" not in listing.text
+    assert "signing_secret" not in listing.text
     audit = c.get("/api/v1/audit?limit=500", headers=h).text
-    assert "SECRETTOKEN" not in audit and created["signing_secret"] not in audit
+    assert "SECRETTOKEN" not in audit
+    assert created["signing_secret"] not in audit
 
 
 @pytest.mark.parametrize(
@@ -103,7 +105,8 @@ def test_internal_names_cannot_be_saved(env):
         headers=h,
         json={"name": "meta", "url": URL, "events": ["alert.created"]},
     )
-    assert r.status_code == 422 and "public" in r.text
+    assert r.status_code == 422
+    assert "public" in r.text
 
 
 def test_an_alert_is_delivered_signed_with_the_channel_secret(env):
@@ -112,13 +115,16 @@ def test_an_alert_is_delivered_signed_with_the_channel_secret(env):
     alert(cp)
     assert cp.dispatch_notifications() == 1
     (req,) = rx.requests
-    assert req.headers["host"] == "hooks.example.com" and req.url.host == PUBLIC
+    assert req.headers["host"] == "hooks.example.com"
+    assert req.url.host == PUBLIC
     assert req.url.path == "/services/T000/B000/SECRETTOKEN"
     ts = int(req.headers["x-neurawall-timestamp"])
     assert req.headers["x-neurawall-signature"] == sign(secret, ts, req.content)
     body = rx.bodies[0]
-    assert body["event"] == "alert.created" and body["data"]["alert_id"] == 7
-    assert "C2 beacon" in body["text"] and body["link"].endswith("/alerts/7")
+    assert body["event"] == "alert.created"
+    assert body["data"]["alert_id"] == 7
+    assert "C2 beacon" in body["text"]
+    assert body["link"].endswith("/alerts/7")
     assert [d.status for d in deliveries(cp)] == ["sent"]
 
 
@@ -128,7 +134,8 @@ def test_each_event_is_delivered_once_per_channel(env):
     make_channel(c, h, name="pager")
     alert(cp)
     alert(cp)  # the same alert again
-    assert cp.dispatch_notifications() == 2 and cp.dispatch_notifications() == 0
+    assert cp.dispatch_notifications() == 2
+    assert cp.dispatch_notifications() == 0
     assert len(rx.requests) == 2
 
 
@@ -157,7 +164,8 @@ def test_a_paused_channel_receives_nothing(env):
     )
     alert(cp)
     cp.dispatch_notifications()
-    assert rx.requests == [] and deliveries(cp) == []
+    assert rx.requests == []
+    assert deliveries(cp) == []
 
 
 def test_failures_are_retried_with_backoff_then_marked_dead(env, monkeypatch):
@@ -168,15 +176,18 @@ def test_failures_are_retried_with_backoff_then_marked_dead(env, monkeypatch):
     assert cp.dispatch_notifications() == 0
     (d,) = deliveries(cp)
     assert (d.status, d.attempts, d.http_status) == ("pending", 1, None)
-    assert "500" in d.error and d.next_try_at > time.time()
-    assert cp.dispatch_notifications() == 0 and len(rx.requests) == 1  # not due: no hammering
+    assert "500" in d.error
+    assert d.next_try_at > time.time()
+    assert cp.dispatch_notifications() == 0
+    assert len(rx.requests) == 1  # not due: no hammering
     real = service_module.time.time
     offset = 0
     for _ in range(cp.NOTIFY_MAX_ATTEMPTS - 1):
         offset += 4000
         monkeypatch.setattr(service_module.time, "time", lambda o=offset: real() + o)
         cp.dispatch_notifications()
-    assert deliveries(cp)[0].status == "dead" and len(rx.requests) == cp.NOTIFY_MAX_ATTEMPTS
+    assert deliveries(cp)[0].status == "dead"
+    assert len(rx.requests) == cp.NOTIFY_MAX_ATTEMPTS
 
 
 def test_a_receiver_that_recovers_gets_the_notification(env, monkeypatch):
@@ -200,7 +211,8 @@ def test_a_name_that_later_resolves_internally_is_never_contacted(env):
     assert cp.dispatch_notifications() == 0
     assert rx.requests == []
     (d,) = deliveries(cp)
-    assert d.status == "dead" and "public" in d.error  # permanent: no retries
+    assert d.status == "dead"
+    assert "public" in d.error  # permanent: no retries
 
 
 def test_rotating_the_secret_invalidates_the_old_one(env):
@@ -237,7 +249,8 @@ def test_test_message_reports_success_and_failure_and_is_rate_limited(env):
     assert "test message" in rx.bodies[0]["text"]
     rx.status = 500
     bad = c.post(f"/api/v1/notifications/channels/{ch['id']}/test", headers=h).json()
-    assert bad["ok"] is False and "500" in bad["error"]
+    assert bad["ok"] is False
+    assert "500" in bad["error"]
     codes = [
         c.post(f"/api/v1/notifications/channels/{ch['id']}/test", headers=h).status_code
         for _ in range(9)
@@ -316,4 +329,5 @@ def test_names_may_be_unicode_and_are_trimmed(env):
         headers=h,
         json={"name": "  Zespół SOC 🚨  ", "url": URL, "events": ["alert.created"]},
     )
-    assert r.status_code == 201 and r.json()["name"] == "Zespół SOC 🚨"
+    assert r.status_code == 201
+    assert r.json()["name"] == "Zespół SOC 🚨"

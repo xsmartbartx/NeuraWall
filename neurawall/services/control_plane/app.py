@@ -55,6 +55,8 @@ _CSP = (
     "form-action 'self'"
 )
 
+_DOCS_PATH = "/api/docs"
+
 
 def create_app(
     settings: Settings | None = None,
@@ -85,7 +87,7 @@ def create_app(
         title="NeuraWall Control Plane",
         version=__version__,
         lifespan=lifespan,
-        docs_url="/api/docs",
+        docs_url=_DOCS_PATH,
         redoc_url=None,
         openapi_url="/api/openapi.json",
     )
@@ -128,7 +130,7 @@ def create_app(
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Referrer-Policy"] = "no-referrer"
             response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-            if not request.url.path.startswith("/api/docs"):
+            if not request.url.path.startswith(_DOCS_PATH):
                 response.headers["Content-Security-Policy"] = _CSP
             if settings.public_url.startswith("https://"):
                 response.headers["Strict-Transport-Security"] = (
@@ -177,7 +179,7 @@ def _mount_console(app: FastAPI) -> None:
                     "service": "neurawall",
                     "version": __version__,
                     "console": "not built — run `npm run build` in console/",
-                    "api_docs": "/api/docs",
+                    "api_docs": _DOCS_PATH,
                 }
             )
 

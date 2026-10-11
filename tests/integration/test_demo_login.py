@@ -41,7 +41,8 @@ def test_a_guest_is_a_read_only_viewer_with_a_short_session(tmp_path):
         r = c.post("/api/v1/auth/demo")
         assert r.status_code == 200, r.text
         body = r.json()
-        assert body["user"]["role"] == "viewer" and body["expires_in"] == 1800
+        assert body["user"]["role"] == "viewer"
+        assert body["expires_in"] == 1800
         h = {"Authorization": f"Bearer {body['access_token']}"}
         assert c.get("/api/v1/alerts", headers=h).status_code == 200
         for method, path in (
@@ -75,7 +76,8 @@ def test_the_guest_account_is_refused_if_an_admin_changes_it(tmp_path):
 def test_it_is_rate_limited_per_address(tmp_path):
     with client(tmp_path, demo_mode=True) as c:
         codes = [c.post("/api/v1/auth/demo").status_code for _ in range(7)]
-        assert codes[:5] == [200] * 5 and set(codes[5:]) == {403}
+        assert codes[:5] == [200] * 5
+        assert set(codes[5:]) == {403}
 
 
 @pytest.mark.parametrize(

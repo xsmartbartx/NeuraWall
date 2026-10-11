@@ -129,12 +129,11 @@ def check_nodes(current: int, plan: Plan, adding: int = 1) -> QuotaDecision:
     if plan.nodes_limit is None:
         return QuotaDecision(True, current, None, "unlimited")
     allowed = current + adding <= plan.nodes_limit
-    reason = (
-        "within quota"
-        if allowed
-        else (
-            f"the {plan.name} plan includes {plan.nodes_limit} enforcement node"
-            f"{'s' if plan.nodes_limit != 1 else ''}; upgrade to enroll more"
+    reason = "within quota"
+    if not allowed:
+        plural = "s" if plan.nodes_limit != 1 else ""
+        reason = (
+            f"the {plan.name} plan includes {plan.nodes_limit} enforcement node{plural}; "
+            "upgrade to enroll more"
         )
-    )
     return QuotaDecision(allowed, current, plan.nodes_limit, reason)

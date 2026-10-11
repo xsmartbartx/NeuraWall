@@ -62,7 +62,7 @@ export function Alerts() {
   );
 }
 
-function AlertDrawer({ id, onClose, onChange }: { id: number; onClose: () => void; onChange: () => void }) {
+function AlertDrawer({ id, onClose, onChange }: Readonly<{ id: number; onClose: () => void; onChange: () => void }>) {
   const { can } = useAuth();
   const { run, busy } = useAction();
   const { data: a, error, reload, setData } = useApi<Alert>(`/alerts/${id}`, { poll: 8000 });

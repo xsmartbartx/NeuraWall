@@ -46,7 +46,8 @@ def test_auth_required_and_login(client):
     assert bad.status_code == 403
     h = login(client)
     me = client.get("/api/v1/auth/me", headers=h).json()
-    assert me["role"] == "admin" and "rules:approve" in me["permissions"]
+    assert me["role"] == "admin"
+    assert "rules:approve" in me["permissions"]
     assert len(client.get("/api/v1/rules", headers=h).json()) == 7
 
 
@@ -112,7 +113,8 @@ def test_agent_enroll_ingest_and_block_roundtrip(client):
     assert client.get("/api/v1/agent/bundle", headers=h).status_code == 401
 
     bundle = client.get("/api/v1/agent/bundle", headers=nh).json()
-    assert bundle["key_id"] == enr["signing_key_id"] and bundle["payload"]["version"] == 1
+    assert bundle["key_id"] == enr["signing_key_id"]
+    assert bundle["payload"]["version"] == 1
 
     gen = TrafficGenerator(seed=3)
     benign = [f.model_dump(mode="json") for f in (gen.benign() for _ in range(200))]
@@ -123,7 +125,8 @@ def test_agent_enroll_ingest_and_block_roundtrip(client):
     attack = [f.model_dump(mode="json") for f in gen.scenario("command_injection", 10)]
     attack.append({"src_ip": "not-an-ip", "dst_ip": "1.1.1.1"})
     out = client.post("/api/v1/agent/flows", headers=nh, json={"flows": attack}).json()
-    assert out["rejected"] == 1 and out["verdicts"]
+    assert out["rejected"] == 1
+    assert out["verdicts"]
     assert all(v["verdict"]["rule_id"] for v in out["verdicts"])
 
     hb = client.post(
@@ -133,13 +136,16 @@ def test_agent_enroll_ingest_and_block_roundtrip(client):
     )
     assert hb.status_code == 200
     nodes = client.get("/api/v1/nodes", headers=h).json()
-    assert nodes[0]["status"] == "online" and nodes[0]["up_to_date"]
+    assert nodes[0]["status"] == "online"
+    assert nodes[0]["up_to_date"]
 
     alerts = client.get("/api/v1/alerts", headers=h).json()
     assert alerts["total"] >= 1
     aid = alerts["items"][0]["id"]
     triaged = client.post(f"/api/v1/alerts/{aid}/triage", headers=h).json()
-    assert triaged["id"] == aid and triaged["summary"] and not triaged["tier3_pending"]
+    assert triaged["id"] == aid
+    assert triaged["summary"]
+    assert not triaged["tier3_pending"]
     # Fully blocked by an existing rule: no redundant draft is proposed.
     assert (triaged["draft_id"] is None) == (triaged["blocked_count"] == triaged["flow_count"])
     flows = client.get(f"/api/v1/flows?alert_id={aid}", headers=h).json()
@@ -163,18 +169,22 @@ def test_draft_approve_flow_via_api(client):
     ).json()
     assert d["draft"]["simulation"] is not None
     r = client.post(f"/api/v1/drafts/{d['id']}/approve", headers=h, json={"mode": "enforce"})
-    assert r.status_code == 200 and r.json()["id"] == "R-000008"
+    assert r.status_code == 200
+    assert r.json()["id"] == "R-000008"
     bundles = client.get("/api/v1/bundles", headers=h).json()
-    assert bundles[0]["version"] == 2 and bundles[0]["rollout_percent"] == 5
+    assert bundles[0]["version"] == 2
+    assert bundles[0]["rollout_percent"] == 5
     assert client.post("/api/v1/bundles/2/advance", headers=h).json()["rollout_percent"] == 25
     audit = client.get("/api/v1/audit/verify", headers=h).json()
-    assert audit["valid"] and audit["entries"] > 3
+    assert audit["valid"]
+    assert audit["entries"] > 3
 
 
 def test_dashboard(client):
     h = login(client)
     d = client.get("/api/v1/dashboard", headers=h).json()
-    assert d["active_rules"] == 7 and d["advisor_mode"] == "offline"
+    assert d["active_rules"] == 7
+    assert d["advisor_mode"] == "offline"
 
 
 def test_login_rate_limit(client):

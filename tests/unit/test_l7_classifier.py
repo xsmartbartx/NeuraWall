@@ -78,4 +78,5 @@ def test_attributions_present_and_bounded():
     gen = TrafficGenerator(seed=2)
     for c in L7Classifier().classify(gen.scenario("sql_injection", 1)[0]):
         if c.label != ThreatLabel.BENIGN:
-            assert c.attributions and len(c.attributions) <= 8
+            assert c.attributions
+            assert len(c.attributions) <= 8

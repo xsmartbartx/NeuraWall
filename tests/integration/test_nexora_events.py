@@ -55,7 +55,8 @@ def test_standalone_queues_nothing(tmp_path):
             ]
         }
         assert enroll(c, h).status_code == 201
-    assert len(cp._events) == 0 and cp.outbox_depth() == 0
+    assert len(cp._events) == 0
+    assert cp.outbox_depth() == 0
     assert not any(t.name == "outbox" for t in cp._threads)
 
 
@@ -64,7 +65,8 @@ def test_events_reach_nexora_once_with_the_key(linked):
     assert enroll(c, h).status_code == 201
     assert cp.flush_outbox() >= 1
     req = [r for r in fake.requests if r.url.path == "/v1/events"][-1]
-    assert req.method == "POST" and req.headers["authorization"] == f"Bearer {KEY}"
+    assert req.method == "POST"
+    assert req.headers["authorization"] == f"Bearer {KEY}"
     types = [e["type"] for e in fake.events]
     assert "neurawall.node.enrolled" in types
     assert len({e["event_id"] for e in fake.events}) == len(fake.events)
@@ -85,8 +87,11 @@ def test_no_address_email_or_flow_field_leaves_the_host(linked):
     sent = json.dumps(fake.events)
     assert "neurawall.alert.created" in sent
     for flow in flows:
-        assert flow["src_ip"] not in sent and flow["dst_ip"] not in sent
-    assert ADMIN[0] not in sent and KEY not in sent and "edge-1" not in sent
+        assert flow["src_ip"] not in sent
+        assert flow["dst_ip"] not in sent
+    assert ADMIN[0] not in sent
+    assert KEY not in sent
+    assert "edge-1" not in sent
 
 
 def test_a_failed_send_is_retried_later_with_the_same_event_id(linked, monkeypatch):
@@ -95,7 +100,8 @@ def test_a_failed_send_is_retried_later_with_the_same_event_id(linked, monkeypat
     fake.events_status = 500
     assert cp.flush_outbox() == 0
     first = outbox(cp)
-    assert first and all(r.attempts == 1 and r.sent_at is None for r in first)
+    assert first
+    assert all(r.attempts == 1 and r.sent_at is None for r in first)
     assert all(r.next_try_at > time.time() for r in first)
     ids = {r.event_id for r in first}
     assert cp.flush_outbox() == 0  # not due yet: no hammering
@@ -137,7 +143,8 @@ def test_batches_are_capped(linked):
     sent = []
     while n := cp.flush_outbox():
         sent.append(n)
-    assert max(sent) == 100 and sum(sent) == already + 250
+    assert max(sent) == 100
+    assert sum(sent) == already + 250
     assert len(fake.events) == already + 250
 
 
@@ -175,7 +182,8 @@ def test_the_hourly_rollup_counts_flows_not_flows_themselves(linked, monkeypatch
     monkeypatch.setattr(service_module.time, "time", lambda: real() + 3700)
     cp.flush_outbox()
     rollup = [e for e in fake.events if e["type"] == "neurawall.flows.ingested"]
-    assert len(rollup) == 1 and rollup[0]["data"] == {"count": 30}
+    assert len(rollup) == 1
+    assert rollup[0]["data"] == {"count": 30}
 
 
 def test_sent_events_are_purged_and_the_backlog_is_bounded(linked, monkeypatch):
@@ -190,7 +198,8 @@ def test_sent_events_are_purged_and_the_backlog_is_bounded(linked, monkeypatch):
             s.add(db.CoreOutbox(event_id=f"u{i}", event_type="x", payload={}))
     cp.purge_outbox()
     ids = [r.event_id for r in outbox(cp)]
-    assert "old" not in ids and "fresh" in ids
+    assert "old" not in ids
+    assert "fresh" in ids
     assert [i for i in ids if i.startswith("u")] == [f"u{i}" for i in range(7, 12)]
 
 
@@ -198,5 +207,6 @@ def test_the_status_reports_pending_events(linked):
     _, c, h, _ = linked
     enroll(c, h)
     status = c.get("/api/v1/nexora/status", headers=h).json()
-    assert status["events_enabled"] is True and status["events_pending"] >= 1
+    assert status["events_enabled"] is True
+    assert status["events_pending"] >= 1
     assert ORG in (status["organisation"] or "")

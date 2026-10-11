@@ -31,9 +31,12 @@ def test_render_only_enforced_static_rules():
     label = make_rule(2, match=RuleMatch(labels=[ThreatLabel.DGA]))
     alert_only = make_rule(3, mode=RuleMode.ALERT_ONLY, match=RuleMatch(dst_ports=[25]))
     text = render_ruleset(PolicyBundle(version=2, rules=[static, label, alert_only]))
-    assert "R-000001" in text and "R-000002" not in text and "R-000003" not in text
+    assert "R-000001" in text
+    assert "R-000002" not in text
+    assert "R-000003" not in text
     assert text.count("jump enforce") == 2
-    assert is_static(static) and not is_static(label)
+    assert is_static(static)
+    assert not is_static(label)
 
 
 def test_dry_run_backend_applies_and_caches():
@@ -43,21 +46,26 @@ def test_dry_run_backend_applies_and_caches():
             version=3, rules=[make_rule(1), make_rule(2, match=RuleMatch(labels=[ThreatLabel.DGA]))]
         )
     )
-    assert res.ok and res.static_rules == 1 and res.dynamic_rules == 1
+    assert res.ok
+    assert res.static_rules == 1
+    assert res.dynamic_rules == 1
     f = make_flow()
     assert not be.apply_verdict(f, Verdict(flow_id=f.flow_id, action=Action.ALERT, enforced=False))
     assert be.apply_verdict(
         f, Verdict(flow_id=f.flow_id, action=Action.DROP, enforced=True, rule_id="R-000002")
     )
     assert be.cache.get(f) == (Action.DROP, "R-000002")
-    assert be.state().applied_version == 3 and be.state().active_blocks == 1
+    assert be.state().applied_version == 3
+    assert be.state().active_blocks == 1
 
 
 def test_parse_flows_counts_malformed():
     res = parse_flows(
         [{"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2"}, {"src_ip": "bad"}, "x"], node_id="n1"
     )
-    assert len(res.flows) == 1 and res.rejected == 2 and res.flows[0].node_id == "n1"
+    assert len(res.flows) == 1
+    assert res.rejected == 2
+    assert res.flows[0].node_id == "n1"
 
 
 def test_zeek_join(tmp_path):
@@ -94,7 +102,8 @@ def test_zeek_join(tmp_path):
     res = read_zeek_dir(tmp_path, node_id="sensor-1")
     assert len(res.flows) == 2
     tls_flow = next(f for f in res.flows if f.flow_id == "C1")
-    assert tls_flow.sni == "example.com" and tls_flow.direction == "outbound"
+    assert tls_flow.sni == "example.com"
+    assert tls_flow.direction == "outbound"
     assert next(f for f in res.flows if f.flow_id == "C2").dns_qname == "example.com"
 
 

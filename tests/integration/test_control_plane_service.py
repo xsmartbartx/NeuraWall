@@ -32,7 +32,8 @@ def warm(cp, gen, n=300):
 
 def test_bootstrap_admin_starter_rules_and_initial_bundle(cp):
     token, user = cp.login("admin@neurawall.local", "Admin-Password-1!")
-    assert token and user.role == "admin"
+    assert token
+    assert user.role == "admin"
     with pytest.raises(PolicyViolation):
         cp.login("admin@neurawall.local", "wrong")
     assert len(cp.list_rules()) == 7
@@ -44,7 +45,8 @@ def test_ingest_blocks_injection_and_creates_alert(cp):
     gen = TrafficGenerator(seed=5)
     warm(cp, gen)
     out = cp.ingest("n1", gen.scenario("sql_injection", 10))
-    assert out.accepted == 10 and out.verdicts
+    assert out.accepted == 10
+    assert out.verdicts
     assert all(v.rule_id == "R-000001" and v.action == Action.DROP for v in out.verdicts)
     alerts, total = cp.list_alerts()
     assert total >= 1
@@ -53,7 +55,8 @@ def test_ingest_blocks_injection_and_creates_alert(cp):
     # All flows of one source + threat form a single incident, blocked or not.
     assert len(related) == 1
     incident = related[0]
-    assert incident.blocked_count == len(out.verdicts) and incident.flow_count == 10
+    assert incident.blocked_count == len(out.verdicts)
+    assert incident.flow_count == 10
     assert incident.tier3_pending
 
 
@@ -63,11 +66,13 @@ def test_tier3_triage_drafts_rule_and_approval_publishes_bundle(cp):
     cp.ingest("n1", gen.scenario("c2_beacon", 8))
     alert = next(a for a in cp.list_alerts()[0] if "c2_beacon" in a.labels)
     triaged = cp.triage_alert(alert.id)
-    assert triaged.draft_id and not triaged.tier3_pending
+    assert triaged.draft_id
+    assert not triaged.tier3_pending
     draft_row = cp.get_draft(triaged.draft_id)
     assert draft_row.data["simulation"]["flows_evaluated"] > 0
     rule = cp.approve_draft("approver@x", triaged.draft_id, mode=RuleMode.ENFORCE, note="confirmed")
-    assert rule.approved_by == "approver@x" and rule.mode == RuleMode.ENFORCE
+    assert rule.approved_by == "approver@x"
+    assert rule.mode == RuleMode.ENFORCE
     assert cp.latest_version() == 2
     with pytest.raises(PolicyViolation):
         cp.approve_draft("approver@x", triaged.draft_id, mode=RuleMode.ENFORCE)
@@ -133,7 +138,8 @@ def test_node_enrollment_and_signed_bundle(cp):
     kid, pem = cp.public_key()
     env = cp.bundle_for_node(node.id)
     bundle = open_bundle(env, {kid: load_public_key(pem)})
-    assert bundle.version == 1 and len(bundle.rules) == 7
+    assert bundle.version == 1
+    assert len(bundle.rules) == 7
     forged = SignedEnvelope.model_validate(sign_with_other_key(env))
     with pytest.raises(IntegrityFailure):
         open_bundle(forged, {kid: load_public_key(pem)})
@@ -153,7 +159,8 @@ def test_staged_rollout_advances_to_active(cp):
     cp.update_rule("admin", "R-000003", mode=RuleMode.ENFORCE)
     v = cp.latest_version()
     rows = {b.version: b for b in cp.list_bundles()}
-    assert rows[v].status == "rolling_out" and rows[v].stage_index == 0
+    assert rows[v].status == "rolling_out"
+    assert rows[v].stage_index == 0
     cp.run_maintenance()
     cp.run_maintenance()
     assert {b.version: b for b in cp.list_bundles()}[v].status == "active"
@@ -161,7 +168,8 @@ def test_staged_rollout_advances_to_active(cp):
 
 def test_rule_update_and_hygiene(cp):
     r = cp.update_rule("admin", "R-000005", enabled=False)
-    assert not r.enabled and r.version == 2
+    assert not r.enabled
+    assert r.version == 2
     assert isinstance(cp.hygiene(), list)
 
 
@@ -180,7 +188,8 @@ def test_dashboard_and_explain(cp):
     warm(cp, gen)
     cp.ingest("n1", gen.scenario("dga", 10))
     d = cp.dashboard()
-    assert d["total_flows"] >= 310 and "dga" in d["labels"]
+    assert d["total_flows"] >= 310
+    assert "dga" in d["labels"]
     with cp.db.session() as s:
         fid = s.query(db.FlowRow.flow_id).filter(db.FlowRow.labels.contains("dga")).first()[0]
     assert "explanation" in cp.explain_flow(fid)
@@ -191,7 +200,8 @@ def test_label_rule_blocks_enforced_c2_after_promotion(cp):
     gen = TrafficGenerator(seed=9)
     warm(cp, gen)
     out = cp.ingest("n1", gen.scenario("c2_beacon", 5))
-    assert out.verdicts and all(v.action == Action.QUARANTINE for v in out.verdicts)
+    assert out.verdicts
+    assert all(v.action == Action.QUARANTINE for v in out.verdicts)
     assert ThreatLabel.C2_BEACON in out.verdicts[0].labels
 
 
@@ -199,9 +209,11 @@ def test_rollback_restores_rules_as_new_version(cp):
     cp.update_rule("admin", "R-000005", enabled=False)  # v2
     assert not cp.get_rule("R-000005").enabled
     new = cp.rollback_bundle("admin", 2, "too noisy")
-    assert new == 3 and cp.get_rule("R-000005").enabled
+    assert new == 3
+    assert cp.get_rule("R-000005").enabled
     statuses = {b.version: b.status for b in cp.list_bundles()}
-    assert statuses[2] == "rolled_back" and statuses[3] == "active"
+    assert statuses[2] == "rolled_back"
+    assert statuses[3] == "active"
     assert cp.bundle_for_node("any-node").payload["version"] == 3
 
 
@@ -214,7 +226,8 @@ def test_triage_skips_enforced_and_dedupes_drafts(cp):
     for a in alerts:
         cp.triage_alert(a.id)
     fully_blocked = [a for a in cp.list_alerts()[0] if a.blocked_count == a.flow_count]
-    assert fully_blocked and all(a.draft_id is None for a in fully_blocked)
+    assert fully_blocked
+    assert all(a.draft_id is None for a in fully_blocked)
     matches = [str(d.data["match"]) for d in cp.list_drafts("pending")]
     assert len(matches) == len(set(matches))
 
@@ -245,7 +258,8 @@ def test_bootstrap_password_file_removed_after_first_change(tmp_path):
     settings = load_settings(environment="test", data_dir=tmp_path)
     plane = ControlPlane(settings, signer=EphemeralSigner(), advisor_backend=None)
     f = tmp_path / "initial-admin-password.txt"
-    assert f.exists() and oct(f.stat().st_mode & 0o777) == "0o600"
+    assert f.exists()
+    assert oct(f.stat().st_mode & 0o777) == "0o600"
     assert oct(tmp_path.stat().st_mode & 0o777) == "0o700"
     email, password = f.read_text().split()
     _, user = plane.login(email, password)
@@ -265,5 +279,6 @@ def test_signing_key_rotation_republishes_bundle(tmp_path):
     rotated = EphemeralSigner()
     second = ControlPlane(settings, signer=rotated, advisor_backend=None)
     env = second.bundle_for_node("node-x")
-    assert env.key_id == rotated.key_id and env.payload["version"] == 2
+    assert env.key_id == rotated.key_id
+    assert env.payload["version"] == 2
     second.stop()

@@ -46,7 +46,9 @@ def post_event(c, cp, payload, secret="whsec_test"):
 def test_default_is_community_with_one_node_and_offline_ai(env):
     cp, c, h = env
     st = c.get("/api/v1/billing", headers=h).json()
-    assert st["plan"]["id"] == "community" and st["source"] == "licence" and st["self_serve"]
+    assert st["plan"]["id"] == "community"
+    assert st["source"] == "licence"
+    assert st["self_serve"]
     pro = next(p for p in st["plans"] if p["id"] == "pro")
     assert pro["purchasable"] == {"month": True, "year": False}
     cp.enroll_node(
@@ -73,7 +75,8 @@ def test_webhook_upgrades_then_cancels(env):
     assert iid.startswith("nwi_")
     assert post_event(c, cp, event(install=iid)).json() == {"status": "applied"}
     st = c.get("/api/v1/billing", headers=h).json()
-    assert st["plan"]["id"] == "pro" and st["source"] == "stripe"
+    assert st["plan"]["id"] == "pro"
+    assert st["source"] == "stripe"
     assert st["subscription"]["manageable"]
     for i in range(2, 6):  # Pro includes 5 nodes
         cp.enroll_node(
@@ -114,7 +117,8 @@ def test_checkout_rbac_and_validation(env, monkeypatch):
         lambda self, **kw: f"https://checkout.stripe.com/{kw['price_id']}",
     )
     r = c.post("/api/v1/billing/checkout", headers=h, json={"plan": "pro", "interval": "month"})
-    assert r.status_code == 200 and r.json()["checkout_url"].endswith("price_pro_m")
+    assert r.status_code == 200
+    assert r.json()["checkout_url"].endswith("price_pro_m")
     assert (
         c.post(
             "/api/v1/billing/checkout", headers=h, json={"plan": "pro", "interval": "year"}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+import math
 import re
 from typing import Annotated
 
@@ -61,7 +62,7 @@ def is_valid_rule_id(value: str) -> bool:
 
 def check_probability(value: float, *, what: str) -> float:
     """Range-check a model output. Out-of-range is a :class:`ModelFault`."""
-    if value != value or not 0.0 <= value <= 1.0:  # NaN check first
+    if math.isnan(value) or not 0.0 <= value <= 1.0:
         raise ModelFault(f"{what} out of range: {value!r}")
     return float(value)
 

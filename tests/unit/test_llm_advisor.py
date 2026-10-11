@@ -50,9 +50,11 @@ def test_offline_summary_and_narrative():
     evs = evidence_for("exfiltration", 20)
     adv = LlmAdvisor(None)
     s = adv.summarize_alert(evs)
-    assert s.severity == "critical" and s.recommended_actions
+    assert s.severity == "critical"
+    assert s.recommended_actions
     n = adv.narrate_incident(evs)
-    assert n.timeline and n.source == DraftSource.HEURISTIC
+    assert n.timeline
+    assert n.source == DraftSource.HEURISTIC
 
 
 def _llm_draft(**match_kw):
@@ -84,7 +86,8 @@ def _llm_draft(**match_kw):
 def test_llm_draft_forced_to_alert_only_and_validated():
     backend = FakeBackend(_llm_draft())
     d = LlmAdvisor(backend).draft_rule(evidence_for("c2_beacon", 3), [])
-    assert d.source == DraftSource.LLM and d.mode == RuleMode.ALERT_ONLY
+    assert d.source == DraftSource.LLM
+    assert d.mode == RuleMode.ALERT_ONLY
     assert d.match.dst_cidrs == ["203.0.113.9/32"]
 
 
@@ -103,7 +106,8 @@ def test_empty_llm_match_is_rejected():
 def test_backend_error_degrades():
     adv = LlmAdvisor(FakeBackend(error=RecoverableError("down")))
     d = adv.draft_rule(evidence_for("sql_injection", 3), [])
-    assert d.source == DraftSource.HEURISTIC and adv.mode == "degraded"
+    assert d.source == DraftSource.HEURISTIC
+    assert adv.mode == "degraded"
 
 
 def test_budget_exhaustion_stops_llm_calls():
@@ -142,7 +146,8 @@ def test_neutralise_and_markers():
 def test_explain_verdict_offline():
     v = Verdict(flow_id="f", action=Action.ALERT, enforced=False, reasons=["anomaly 0.9"])
     text, src = LlmAdvisor(None).explain_verdict(v, None, None)
-    assert "Models alone never block" in text and src == DraftSource.HEURISTIC
+    assert "Models alone never block" in text
+    assert src == DraftSource.HEURISTIC
 
 
 def test_tokens_are_recorded_even_when_the_call_is_refused_or_truncated():

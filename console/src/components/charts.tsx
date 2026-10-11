@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { num } from "../lib/format";
-import { activatable } from "./ui";
 
 type Point = { ts: number; allow: number; alert: number; blocked: number };
 
@@ -11,7 +10,7 @@ const SERIES = [
 ] as const;
 
 /** Stacked bar timeline of verdicts per bucket. */
-export function VerdictTimeline({ points, bucket }: { points: Point[]; bucket: number }) {
+export function VerdictTimeline({ points, bucket }: Readonly<{ points: Point[]; bucket: number }>) {
   const [tip, setTip] = useState<{ x: number; y: number; p: Point } | null>(null);
   const W = 900, H = 220, L = 44, B = 22, T = 8;
   const max = Math.max(1, ...points.map((p) => p.allow + p.alert + p.blocked));
@@ -69,21 +68,27 @@ export function VerdictTimeline({ points, bucket }: { points: Point[]; bucket: n
   );
 }
 
-export function BarList({ items, color = "var(--alert)", onClick }: {
+export function BarList({ items, color = "var(--alert)", onClick }: Readonly<{
   items: { label: string; value: number }[]; color?: string; onClick?: (label: string) => void;
-}) {
+}>) {
   const max = Math.max(1, ...items.map((i) => i.value));
   if (!items.length) return <div className="muted">No data in this window.</div>;
   return (
     <div className="bar-list">
-      {items.map((i) => (
-        <div key={i.label} className="item" style={{ cursor: onClick ? "pointer" : undefined }} onClick={() => onClick?.(i.label)}
-          {...(onClick ? { role: "button", ...activatable(() => onClick(i.label)) } : {})}>
-          <span className="mono truncate">{i.label}</span>
-          <span className="mono muted">{num(i.value)}</span>
-          <div className="track"><div className="fill" style={{ width: `${(i.value / max) * 100}%`, background: color }} /></div>
-        </div>
-      ))}
+      {items.map((i) => {
+        const body = (
+          <>
+            <span className="mono truncate">{i.label}</span>
+            <span className="mono muted">{num(i.value)}</span>
+            <span className="track"><span className="fill" style={{ width: `${(i.value / max) * 100}%`, background: color }} /></span>
+          </>
+        );
+        return onClick ? (
+          <button key={i.label} type="button" className="item item-btn" onClick={() => onClick(i.label)}>{body}</button>
+        ) : (
+          <div key={i.label} className="item">{body}</div>
+        );
+      })}
     </div>
   );
 }

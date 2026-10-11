@@ -106,13 +106,18 @@ def test_passwords_and_tokens():
 
 def test_api_keys():
     plain, h = generate_api_key()
-    assert plain.startswith("nwk_") and api_key_matches(plain, h)
+    assert plain.startswith("nwk_")
+    assert api_key_matches(plain, h)
     assert not api_key_matches(plain + "x", h)
 
 
 def test_rate_limits():
     rl = KeyedRateLimiter(rate_per_second=0.001, burst=2)
-    assert rl.allow("a") and rl.allow("a") and not rl.allow("a")
+    assert rl.allow("a")
+    assert rl.allow("a")
+    assert not rl.allow("a")
     assert rl.allow("b")
     b = HourlyBudget(2)
-    assert b.try_spend() and b.try_spend() and not b.try_spend()
+    assert b.try_spend()
+    assert b.try_spend()
+    assert not b.try_spend()

@@ -8,9 +8,9 @@ import { useAction, useApi, useAuth } from "../lib/hooks";
 
 const LIMIT = 100;
 
-export function FlowTable({ items, compact, onSelect, selected }: {
+export function FlowTable({ items, compact, onSelect, selected }: Readonly<{
   items: FlowSummary[]; compact?: boolean; onSelect?: (id: string) => void; selected?: string | null;
-}) {
+}>) {
   if (!items.length) return <Empty>No flows match.</Empty>;
   return (
     <div className="table-wrap"><table>
@@ -94,7 +94,7 @@ export function Flows() {
   );
 }
 
-function FlowDrawer({ id, onClose }: { id: string; onClose: () => void }) {
+function FlowDrawer({ id, onClose }: Readonly<{ id: string; onClose: () => void }>) {
   const { can } = useAuth();
   const { run, busy } = useAction();
   const { data: f, error } = useApi<FlowDetail>(`/flows/${id}`);
@@ -162,11 +162,11 @@ function FlowDrawer({ id, onClose }: { id: string; onClose: () => void }) {
   );
 }
 
-function FragmentKV({ k, v }: { k: string; v: string }) {
+function FragmentKV({ k, v }: Readonly<{ k: string; v: string }>) {
   return <><dt>{human(k)}</dt><dd className="mono">{v}</dd></>;
 }
 
-function Attributions({ items }: { items: { feature: string; contribution: number; value?: string | number | null }[] }) {
+function Attributions({ items }: Readonly<{ items: { feature: string; contribution: number; value?: string | number | null }[] }>) {
   const max = Math.max(...items.map((a) => Math.abs(a.contribution)), 0.001);
   return (
     <div className="bar-list">

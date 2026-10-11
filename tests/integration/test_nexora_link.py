@@ -104,13 +104,17 @@ def test_a_sync_applies_the_plan_and_calls_nexora_with_the_key(linked):
     cp, c, h, fake = linked
     assert cp.plan().plan_id.value == "community"  # nothing pulled yet
     out = c.post("/api/v1/nexora/sync", headers=h).json()
-    assert out["plan"] == "pro" and out["error"] is None and out["last_ok"]
+    assert out["plan"] == "pro"
+    assert out["error"] is None
+    assert out["last_ok"]
     assert cp.plan().nodes_limit == 5
     req = fake.requests[-1]
-    assert req.method == "GET" and req.url.path == "/v1/entitlements/neurawall"
+    assert req.method == "GET"
+    assert req.url.path == "/v1/entitlements/neurawall"
     assert req.headers["authorization"] == f"Bearer {KEY}"
     billing = c.get("/api/v1/billing", headers=h).json()
-    assert billing["source"] == "nexora" and billing["linked"] is True
+    assert billing["source"] == "nexora"
+    assert billing["linked"] is True
     assert billing["manage_url"] == "https://console.onenexora.com/billing"
     assert billing["self_serve"] is False
     assert all(not any(p["purchasable"].values()) for p in billing["plans"])
@@ -166,7 +170,8 @@ def test_nexora_errors_are_recorded_not_raised(linked, status):
     cp, c, h, fake = linked
     fake.status = status
     r = c.post("/api/v1/nexora/sync", headers=h)
-    assert r.status_code == 200 and r.json()["error"]
+    assert r.status_code == 200
+    assert r.json()["error"]
     assert cp.plan().plan_id.value == "community"
 
 
@@ -182,7 +187,8 @@ def test_the_plan_survives_an_outage_then_lapses(linked, monkeypatch):
     assert cp.plan().plan_id.value == "pro"
     fake.down = True
     out = c.post("/api/v1/nexora/sync", headers=h).json()
-    assert out["error"] == "NEXORA is unreachable" and cp.plan().plan_id.value == "pro"
+    assert out["error"] == "NEXORA is unreachable"
+    assert cp.plan().plan_id.value == "pro"
     # Valid for 4 days after the last good sync, plus 3 days of grace.
     real = service_module.time.time
     monkeypatch.setattr(service_module.time, "time", lambda: real() + 6.5 * 86400)
@@ -276,7 +282,8 @@ def test_empty_nexora_settings_mean_standalone(tmp_path):
         data_dir=tmp_path,
         nexora={"api_key": "", "api_url": "", "console_url": ""},
     )
-    assert not s.nexora.linked and s.nexora.api_url == "https://api.onenexora.com"
+    assert not s.nexora.linked
+    assert s.nexora.api_url == "https://api.onenexora.com"
 
 
 @pytest.mark.parametrize("bad", ["NaN", "Infinity", "-Infinity"])

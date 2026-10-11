@@ -35,6 +35,7 @@ from neurawall.core.telemetry import REGISTRY
 log = get_logger(__name__)
 _malformed = REGISTRY.counter("neurawall_ingest_malformed_total", "Malformed flow records dropped")
 _accepted = REGISTRY.counter("neurawall_ingest_accepted_total", "Flow records accepted")
+_ORIG_H = "id.orig_h"
 MAX_LINE_BYTES = 64 * 1024
 
 
@@ -130,7 +131,7 @@ def zeek_to_flow(
         "node_id": node_id,
         "ts_start": ts,
         "ts_end": ts + float(conn.get("duration") or 0.0),
-        "src_ip": conn["id.orig_h"],
+        "src_ip": conn[_ORIG_H],
         "dst_ip": conn["id.resp_h"],
         "src_port": int(conn.get("id.orig_p", 0)),
         "dst_port": int(conn.get("id.resp_p", 0)),
@@ -162,7 +163,7 @@ def zeek_to_flow(
             body_len=int(http.get("request_body_len") or 0),
         ).model_dump()
     if ssl:
-        ua = (http or {}).get("user_agent") or (ua_by_host or {}).get(conn["id.orig_h"])
+        ua = (http or {}).get("user_agent") or (ua_by_host or {}).get(conn[_ORIG_H])
         l7["tls"] = TlsMeta(
             sni=ssl.get("server_name") or None,
             version=ssl.get("version"),
@@ -183,9 +184,7 @@ def read_zeek_dir(directory: Path, *, node_id: str) -> IngestResult:
         return {r["uid"]: r for r in read_jsonl(p) if "uid" in r} if p.exists() else {}
 
     dns, ssl, http = index("dns"), index("ssl"), index("http")
-    ua_by_host = {
-        r.get("id.orig_h", ""): r["user_agent"] for r in http.values() if r.get("user_agent")
-    }
+    ua_by_host = {r.get(_ORIG_H, ""): r["user_agent"] for r in http.values() if r.get("user_agent")}
     docs: list[Any] = []
     conn = directory / "conn.log"
     if conn.exists():

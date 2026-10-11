@@ -50,7 +50,8 @@ def test_static_serving_survives_odd_paths(static_client):
     # Traversal falls back to the SPA shell and never serves the file outside the folder.
     for path in ("/..%2fsecret.txt", "/%2e%2e/secret.txt", "/..%2f..%2fetc/passwd"):
         r = static_client.get(path)
-        assert "TOP SECRET" not in r.text and "root:" not in r.text
+        assert "TOP SECRET" not in r.text
+        assert "root:" not in r.text
 
 
 def test_audit_verify_does_not_echo_internals(tmp_path):
@@ -64,7 +65,8 @@ def test_audit_verify_does_not_echo_internals(tmp_path):
 
         cp.verify_audit = broken
         body = c.get("/api/v1/audit/verify", headers=h).json()
-        assert body["valid"] is False and "seq 3" not in body["error"]
+        assert body["valid"] is False
+        assert "seq 3" not in body["error"]
 
         def crashed():
             raise RuntimeError("db password=hunter2 host=10.0.0.5")
@@ -72,7 +74,8 @@ def test_audit_verify_does_not_echo_internals(tmp_path):
         cp.verify_audit = crashed
         body = c.get("/api/v1/audit/verify", headers=h).json()
         assert body["valid"] is False
-        assert "hunter2" not in body["error"] and "10.0.0.5" not in body["error"]
+        assert "hunter2" not in body["error"]
+        assert "10.0.0.5" not in body["error"]
 
 
 def test_flow_ingest_errors_do_not_echo_validation_text(tmp_path):

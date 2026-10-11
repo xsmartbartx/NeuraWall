@@ -1,16 +1,16 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { human } from "../lib/format";
 
-export function Badge({ kind, children, dot }: { kind: string; children?: ReactNode; dot?: boolean }) {
+export function Badge({ kind, children, dot }: Readonly<{ kind: string; children?: ReactNode; dot?: boolean }>) {
   return <span className={`badge c-${kind} ${dot ? "dot" : ""}`}>{children ?? human(kind)}</span>;
 }
 
-export function Labels({ labels }: { labels: string[] }) {
+export function Labels({ labels }: Readonly<{ labels: string[] }>) {
   if (!labels.length) return <span className="faint">—</span>;
   return <span className="row" style={{ gap: 4 }}>{labels.map((l) => <span key={l} className="label-chip">{l}</span>)}</span>;
 }
 
-export function Card({ title, actions, children, pad = true }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; pad?: boolean }) {
+export function Card({ title, actions, children, pad = true }: Readonly<{ title?: ReactNode; actions?: ReactNode; children: ReactNode; pad?: boolean }>) {
   return (
     <section className="card">
       {(title || actions) && (
@@ -25,7 +25,7 @@ export function Card({ title, actions, children, pad = true }: { title?: ReactNo
   );
 }
 
-export function Kpi({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: string }) {
+export function Kpi({ label, value, sub, tone }: Readonly<{ label: string; value: ReactNode; sub?: ReactNode; tone?: string }>) {
   return (
     <div className={`card kpi ${tone ?? ""}`}>
       <span className="label">{label}</span>
@@ -35,7 +35,7 @@ export function Kpi({ label, value, sub, tone }: { label: string; value: ReactNo
   );
 }
 
-export function PageHead({ title, desc, actions }: { title: string; desc?: ReactNode; actions?: ReactNode }) {
+export function PageHead({ title, desc, actions }: Readonly<{ title: string; desc?: ReactNode; actions?: ReactNode }>) {
   return (
     <div className="page-head">
       <div><h1>{title}</h1>{desc && <p>{desc}</p>}</div>
@@ -44,19 +44,19 @@ export function PageHead({ title, desc, actions }: { title: string; desc?: React
   );
 }
 
-export function Loading({ what = "Loading" }: { what?: string }) {
+export function Loading({ what = "Loading" }: Readonly<{ what?: string }>) {
   return <div className="empty"><span className="spinner" /> <span style={{ marginLeft: 8 }}>{what}…</span></div>;
 }
 
-export function Empty({ children }: { children: ReactNode }) {
+export function Empty({ children }: Readonly<{ children: ReactNode }>) {
   return <div className="empty">{children}</div>;
 }
 
-export function ErrorBox({ error }: { error: string }) {
+export function ErrorBox({ error }: Readonly<{ error: string }>) {
   return <div className="callout danger">{error}</div>;
 }
 
-export function Meter({ value, warn, label }: { value: number; warn?: boolean; label?: string }) {
+export function Meter({ value, warn, label }: Readonly<{ value: number; warn?: boolean; label?: string }>) {
   const pct = Math.min(100, Math.max(0, Math.round(value * 100)));
   return (
     <div className={`meter ${warn ? "warn" : ""}`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}
@@ -78,11 +78,11 @@ export function activatable(onActivate: () => void) {
   };
 }
 
-export function Drawer({ onClose, title, sub, children }: { onClose: () => void; title: ReactNode; sub?: ReactNode; children: ReactNode }) {
+export function Drawer({ onClose, title, sub, children }: Readonly<{ onClose: () => void; title: ReactNode; sub?: ReactNode; children: ReactNode }>) {
   const ref = useDialog<HTMLElement>(onClose);
   return (
     <>
-      <div className="drawer-backdrop" onClick={onClose} />
+      <div className="drawer-backdrop" onMouseDown={onClose} />
       <aside className="drawer" role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined} ref={ref} tabIndex={-1}>
         <div className="drawer-head">
           <div style={{ flex: 1, minWidth: 0 }}><h2>{title}</h2>{sub && <div className="muted" style={{ marginTop: 4 }}>{sub}</div>}</div>
@@ -94,7 +94,7 @@ export function Drawer({ onClose, title, sub, children }: { onClose: () => void;
   );
 }
 
-export function Modal({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer: ReactNode }) {
+export function Modal({ title, onClose, children, footer }: Readonly<{ title: string; onClose: () => void; children: ReactNode; footer: ReactNode }>) {
   const ref = useDialog<HTMLDivElement>(onClose);
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -137,7 +137,7 @@ function useDialog<T extends HTMLElement>(onClose: () => void) {
   return ref;
 }
 
-export function Pager({ total, limit, offset, onChange }: { total: number; limit: number; offset: number; onChange: (o: number) => void }) {
+export function Pager({ total, limit, offset, onChange }: Readonly<{ total: number; limit: number; offset: number; onChange: (o: number) => void }>) {
   if (total <= limit) return null;
   return (
     <div className="pager">
@@ -148,7 +148,7 @@ export function Pager({ total, limit, offset, onChange }: { total: number; limit
   );
 }
 
-export function Copy({ text }: { text: string }) {
+export function Copy({ text }: Readonly<{ text: string }>) {
   return (
     <button className="small" onClick={() => navigator.clipboard?.writeText(text)} title="Copy to clipboard">Copy</button>
   );

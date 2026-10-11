@@ -18,7 +18,8 @@ def _trained_engine(gen, n=1500):
 def test_untrained_engine_is_low_confidence():
     eng = AnomalyEngine(warmup_flows=100)
     s = eng.score(TrafficGenerator(seed=1).benign())
-    assert 0 <= s.score <= 1 and s.confidence < 0.1
+    assert 0 <= s.score <= 1
+    assert s.confidence < 0.1
 
 
 def test_benign_scores_low_attacks_score_high():

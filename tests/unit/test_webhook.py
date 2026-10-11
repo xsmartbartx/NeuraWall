@@ -83,10 +83,14 @@ def test_a_public_https_url_passes_and_keeps_path_query_and_port():
 
 
 def test_signature_is_a_stable_hmac_over_timestamp_and_body():
-    assert sign("whsec_k", 1700000000, b'{"a":1}') == sign("whsec_k", 1700000000, b'{"a":1}')
-    assert sign("whsec_k", 1700000000, b'{"a":1}') != sign("whsec_k", 1700000001, b'{"a":1}')
-    assert sign("whsec_k", 1700000000, b'{"a":1}') != sign("whsec_x", 1700000000, b'{"a":1}')
-    assert sign("whsec_k", 1, b"x").startswith("sha256=") and len(sign("whsec_k", 1, b"x")) == 71
+    first = sign("whsec_k", 1700000000, b'{"a":1}')
+    again = sign("whsec_k", 1700000000, b'{"a":1}')
+    assert first == again
+    assert first != sign("whsec_k", 1700000001, b'{"a":1}')
+    assert first != sign("whsec_x", 1700000000, b'{"a":1}')
+    short = sign("whsec_k", 1, b"x")
+    assert short.startswith("sha256=")
+    assert len(short) == 71
 
 
 def test_secrets_are_derived_per_channel_and_per_server_key():

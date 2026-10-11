@@ -50,7 +50,7 @@ interface AuthCtx {
 
 const Auth = createContext<AuthCtx | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [me, setMe] = useState<Me | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -101,12 +101,13 @@ export function useAuth(): AuthCtx {
 // ---------------------------------------------------------------- toasts
 
 interface Toast { id: number; text: string; kind: "ok" | "error" }
+let toastSeq = 0;
 const ToastCtx = createContext<(text: string, kind?: "ok" | "error") => void>(() => {});
 
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [items, setItems] = useState<Toast[]>([]);
   const push = useCallback((text: string, kind: "ok" | "error" = "ok") => {
-    const id = Date.now() + Math.random();
+    const id = ++toastSeq;
     setItems((xs) => [...xs, { id, text, kind }]);
     window.setTimeout(() => setItems((xs) => xs.filter((t) => t.id !== id)), kind === "error" ? 7000 : 3500);
   }, []);

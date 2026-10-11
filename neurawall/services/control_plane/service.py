@@ -93,6 +93,12 @@ log = get_logger(__name__)
 ALERT_WINDOW_SECONDS = 1800
 SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 SYSTEM_ACTOR = "system"
+_USER_NOT_FOUND = "user not found"
+_DRAFT_NOT_FOUND = "draft not found"
+_ALERT_NOT_FOUND = "alert not found"
+_CHANNEL_NOT_FOUND = "channel not found"
+_EVT_ALERT_CREATED = "alert.created"
+_NEXORA_SYNC_KEY = "nexora.sync"
 ADVISOR_ACTOR = "tier3-advisor"
 
 _ingested = REGISTRY.counter("neurawall_flows_ingested_total", "Flows ingested by node")
@@ -436,7 +442,7 @@ class ControlPlane:
         with self.db.session() as s:
             u = s.get(db.User, user_id)
             if u is None or not u.active:
-                raise NotFound("user not found")
+                raise NotFound(_USER_NOT_FOUND)
             s.expunge(u)
             return u
 
@@ -482,7 +488,7 @@ class ControlPlane:
         with self.db.session() as s:
             u = s.get(db.User, user_id)
             if u is None:
-                raise NotFound("user not found")
+                raise NotFound(_USER_NOT_FOUND)
             if u.email.endswith("@" + self.ERASED_DOMAIN):
                 raise ValidationFailure("this user is already erased")
             if u.email == actor.lower():
@@ -526,7 +532,7 @@ class ControlPlane:
         with self.db.session() as s:
             u = s.get(db.User, user_id)
             if u is None:
-                raise NotFound("user not found")
+                raise NotFound(_USER_NOT_FOUND)
             if (
                 (role is not None and role != Role.ADMIN) or active is False
             ) and u.role == Role.ADMIN:
@@ -584,7 +590,7 @@ class ControlPlane:
         with self.db.session() as s:
             u = s.get(db.User, user_id)
             if u is None:
-                raise NotFound("user not found")
+                raise NotFound(_USER_NOT_FOUND)
             if u.auth_provider != "local":
                 raise ValidationFailure("this account signs in with NEXORA and has no password")
             u.password_hash = hash_password(temp)
@@ -1047,7 +1053,7 @@ class ControlPlane:
             _alerts_created.inc(severity=sev)
             self._emit("neurawall.alert.created", {"severity": sev})
             self._notify(
-                "alert.created",
+                _EVT_ALERT_CREATED,
                 str(alert.id),
                 {
                     "alert_id": alert.id,
@@ -1185,7 +1191,7 @@ class ControlPlane:
         with self.db.session() as s:
             row = s.get(db.DraftRow, draft_id)
             if row is None:
-                raise NotFound("draft not found")
+                raise NotFound(_DRAFT_NOT_FOUND)
             s.expunge(row)
             return row
 
@@ -1203,7 +1209,7 @@ class ControlPlane:
         with self.db.session() as s:
             row = s.get(db.DraftRow, draft_id)
             if row is None:
-                raise NotFound("draft not found")
+                raise NotFound(_DRAFT_NOT_FOUND)
             if row.status != "pending":
                 raise PolicyViolation(f"draft is already {row.status}")
             if self.settings.policy.require_four_eyes:
@@ -1251,7 +1257,7 @@ class ControlPlane:
         with self.db.session() as s:
             row = s.get(db.DraftRow, draft_id)
             if row is None:
-                raise NotFound("draft not found")
+                raise NotFound(_DRAFT_NOT_FOUND)
             if row.status != "pending":
                 raise PolicyViolation(f"draft is already {row.status}")
             row.status, row.decided_by, row.decided_at = "rejected", actor, time.time()
@@ -1293,7 +1299,7 @@ class ControlPlane:
         with self.db.session() as s:
             a = s.get(db.Alert, alert_id)
             if a is None:
-                raise NotFound("alert not found")
+                raise NotFound(_ALERT_NOT_FOUND)
             s.expunge(a)
             return a
 
@@ -1306,7 +1312,7 @@ class ControlPlane:
         with self.db.session() as s:
             a = s.get(db.Alert, alert_id)
             if a is None:
-                raise NotFound("alert not found")
+                raise NotFound(_ALERT_NOT_FOUND)
             if status:
                 a.status = status
             if assignee is not None:
@@ -1332,7 +1338,7 @@ class ControlPlane:
         with self.db.session() as s:
             a = s.get(db.Alert, alert_id)
             if a is None:
-                raise NotFound("alert not found")
+                raise NotFound(_ALERT_NOT_FOUND)
             a.title, a.summary = summary.title, summary.summary
             a.summary_source = summary.source.value
             a.recommended_actions = list(summary.recommended_actions)
@@ -1370,7 +1376,7 @@ class ControlPlane:
         with self.db.session() as s:
             a = s.get(db.Alert, alert_id)
             if a is None:
-                raise NotFound("alert not found")
+                raise NotFound(_ALERT_NOT_FOUND)
             a.narrative = narrative.model_dump(mode="json")
         self.audit(actor, "alert.narrate", f"alert:{alert_id}", {"source": narrative.source.value})
         return narrative.model_dump(mode="json")
@@ -1553,7 +1559,7 @@ class ControlPlane:
 
     # ------------------------------------------------------------------ notifications
 
-    NOTIFY_EVENTS = ("alert.created", "draft.pending")
+    NOTIFY_EVENTS = (_EVT_ALERT_CREATED, "draft.pending")
     NOTIFY_MAX_ATTEMPTS = 6
     NOTIFY_TESTS_PER_HOUR = 10
 
@@ -1650,7 +1656,7 @@ class ControlPlane:
         with self.db.session() as s:
             ch = s.get(db.NotificationChannel, channel_id)
             if ch is None:
-                raise NotFound("channel not found")
+                raise NotFound(_CHANNEL_NOT_FOUND)
             if name is not None and name != ch.name:
                 if s.scalars(
                     select(db.NotificationChannel).where(db.NotificationChannel.name == name)
@@ -1680,7 +1686,7 @@ class ControlPlane:
         with self.db.session() as s:
             ch = s.get(db.NotificationChannel, channel_id)
             if ch is None:
-                raise NotFound("channel not found")
+                raise NotFound(_CHANNEL_NOT_FOUND)
             s.delete(ch)
         self.audit(actor, "notify.channel_delete", f"channel:{channel_id}")
 
@@ -1688,7 +1694,7 @@ class ControlPlane:
         self, event_type: str, ref: str, ts: float, data: dict[str, Any]
     ) -> dict[str, Any]:
         base = self.settings.public_url.rstrip("/")
-        if event_type == "alert.created":
+        if event_type == _EVT_ALERT_CREATED:
             link, text = (
                 f"{base}/alerts/{ref}",
                 (f"NeuraWall {data.get('severity', '')} alert: {data.get('title', '')}"),
@@ -1710,7 +1716,7 @@ class ControlPlane:
         with self.db.session() as s:
             ch = s.get(db.NotificationChannel, channel_id)
             if ch is None:
-                raise NotFound("channel not found")
+                raise NotFound(_CHANNEL_NOT_FOUND)
             url, secret = ch.url, self._channel_secret(ch)
         payload = self._payload("test", "test", now, {"message": "This is a test from NeuraWall."})
         payload["text"] = "NeuraWall test message: the webhook is working."
@@ -2015,7 +2021,7 @@ class ControlPlane:
         applying until it expires. Enforcement is unaffected by any outcome here."""
         with self._nexora_lock:
             now = time.time()
-            state: dict[str, Any] = dict(self._get_setting("nexora.sync") or {})
+            state: dict[str, Any] = dict(self._get_setting(_NEXORA_SYNC_KEY) or {})
             state["last_try"] = now
             try:
                 ent = self._nexora_client().fetch_entitlement()
@@ -2052,7 +2058,7 @@ class ControlPlane:
             except NexoraError as exc:
                 state["error"] = str(exc)
                 log.warning("NEXORA sync failed", error=str(exc))
-            self._put_setting("nexora.sync", state)
+            self._put_setting(_NEXORA_SYNC_KEY, state)
         return self.nexora_status()
 
     def sync_nexora_manually(self, actor: str) -> dict[str, Any]:
@@ -2065,7 +2071,7 @@ class ControlPlane:
 
     def nexora_status(self) -> dict[str, Any]:
         cfg = self.settings.nexora
-        state = self._get_setting("nexora.sync") or {}
+        state = self._get_setting(_NEXORA_SYNC_KEY) or {}
         sub = self.active_subscription() if self.linked else None
         return {
             "linked": self.linked,
@@ -2084,7 +2090,7 @@ class ControlPlane:
     def _nexora_loop(self) -> None:
         interval = self.settings.nexora.sync_interval_seconds
         # A little jitter so many installations do not call in the same second.
-        wait = random.uniform(0, 10)  # noqa: S311 - scheduling jitter, not security
+        wait = random.uniform(0, 10)  # noqa: S311
         while not self._stop.wait(wait):
             try:
                 self.sync_nexora()
@@ -2249,7 +2255,7 @@ class ControlPlane:
         series: dict[int, dict[str, int]] = {}
         for b, action, n in series_rows:
             slot = series.setdefault(int(b), {"allow": 0, "alert": 0, "blocked": 0})
-            slot["allow" if action == "allow" else "alert" if action == "alert" else "blocked"] += n
+            slot[action if action in ("allow", "alert") else "blocked"] += n
         start = int(since // bucket * bucket)
         timeline = [
             {"ts": t, **series.get(t, {"allow": 0, "alert": 0, "blocked": 0})}
