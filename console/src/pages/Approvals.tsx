@@ -55,7 +55,7 @@ export function Approvals() {
   );
 }
 
-function SimulationView({ sim }: { sim: Simulation }) {
+export function SimulationView({ sim }: { sim: Simulation }) {
   return (
     <div className="stack">
       <div className="row"><h3>Simulation</h3><span className="faint">replayed against {sim.flows_evaluated.toLocaleString()} recent flows</span></div>

@@ -515,6 +515,20 @@ def list_rules(cp: CP, _: Reader) -> list[dict[str, Any]]:
     return [r.model_dump(mode="json") for r in cp.list_rules()]
 
 
+@api.get("/rules/stats", tags=["rules"])
+def rule_stats(
+    cp: CP, _: Reader, hours: Annotated[int, Query(ge=1, le=24 * 30)] = 168
+) -> dict[str, Any]:
+    """Matches per rule over the window (default 7 days) and the time of the last match."""
+    return {"hours": hours, "rules": cp.rule_stats(hours)}
+
+
+@api.get("/rules/{rule_id}/impact", tags=["rules"])
+def rule_impact(rule_id: str, cp: CP, _: Reader) -> dict[str, Any]:
+    """The rule replayed against recent traffic: its blast radius on legitimate flows."""
+    return cp.rule_impact(rule_id).model_dump(mode="json")
+
+
 @api.get("/rules/hygiene", tags=["rules", "advisor"])
 def rule_hygiene(cp: CP, _: Reader) -> list[dict[str, Any]]:
     return cp.hygiene()

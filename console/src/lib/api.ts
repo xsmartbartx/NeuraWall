@@ -101,6 +101,8 @@ export interface Rule {
   created_by: string; approved_by: string | null; created_at: number;
 }
 
+export interface RuleStats { hours: number; rules: Record<string, { matches: number; last_match: number }> }
+
 export interface Simulation {
   flows_evaluated: number; flows_matched: number; blast_radius: number; legitimate_matched: number;
   would_block: number; affected_sources: number; affected_destinations: number;

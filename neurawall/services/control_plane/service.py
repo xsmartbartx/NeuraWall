@@ -713,6 +713,23 @@ class ControlPlane:
                 key=lambda r: (r.priority, r.id),
             )
 
+    def rule_stats(self, hours: int) -> dict[str, dict[str, float | int]]:
+        """How often each rule matched in the last `hours`, and when it last did. One grouped
+        query on the indexed `rule_id`; a rule that never matched has no entry."""
+        since = time.time() - hours * 3600
+        with self.db.session() as s:
+            rows = s.execute(
+                select(db.FlowRow.rule_id, func.count(), func.max(db.FlowRow.ts))
+                .where(db.FlowRow.ts >= since, db.FlowRow.rule_id.is_not(None))
+                .group_by(db.FlowRow.rule_id)
+            ).all()
+        return {rid: {"matches": int(n), "last_match": float(last)} for rid, n, last in rows if rid}
+
+    def rule_impact(self, rule_id: str) -> SimulationResult:
+        """Replay the rule as it is today against recent traffic (same simulator drafts use)."""
+        rule = self.get_rule(rule_id)
+        return self.simulate(rule.match, rule.action)
+
     def get_rule(self, rule_id: str) -> Rule:
         with self.db.session() as s:
             row = s.get(db.RuleRow, rule_id)

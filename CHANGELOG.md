@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Rules page: how many flows each rule matched in the last 7 days and when it last did ("never" makes dead rules visible),
+  and a "Replay against recent traffic" card in the rule drawer showing its blast radius. New `GET /rules/stats` and
+  `GET /rules/{id}/impact`.
+- Rules page: a "Clean up…" action on shadowed and redundant findings (a rule that can never match because an earlier
+  rule covers its traffic). It disables the rule, which changes no verdict, after a confirmation that shows recent matches.
+  It is the existing audited rule update, so it publishes a signed bundle and stays reversible.
+
 ### Changed
 - Web-injection labels (SQL, command and template injection, path traversal, XSS) now raise an alert from a Tier 2
   confidence of 0.5 instead of 0.7, because a single strong payload scores 0.5 to 0.62 (docs/evasion-report.md). Other
