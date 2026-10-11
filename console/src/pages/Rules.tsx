@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Badge, Card, Drawer, ErrorBox, Loading, Modal, PageHead } from "../components/ui";
+import { Badge, Card, Drawer, ErrorBox, Loading, Modal, PageHead, activatable } from "../components/ui";
 import { api, type HygieneFinding, type Rule } from "../lib/api";
 import { dateTime, human, matchSummary } from "../lib/format";
 import { useAction, useApi, useAuth } from "../lib/hooks";
@@ -34,7 +34,7 @@ export function Rules() {
             <thead><tr><th>ID</th><th className="num">Priority</th><th>Name</th><th>Action</th><th>Mode</th><th>Match</th><th>Enabled</th></tr></thead>
             <tbody>
               {data.map((r) => (
-                <tr key={r.id} className={`clickable ${selected?.id === r.id ? "selected" : ""}`} onClick={() => setSelected(r)} style={{ opacity: r.enabled ? 1 : 0.55 }}>
+                <tr key={r.id} className={`clickable ${selected?.id === r.id ? "selected" : ""}`} onClick={() => setSelected(r)} {...activatable(() => setSelected(r))} style={{ opacity: r.enabled ? 1 : 0.55 }}>
                   <td className="mono">{r.id}{findingsFor(r.id).length > 0 && <span title="hygiene finding" style={{ color: "var(--alert)" }}> ●</span>}</td>
                   <td className="num">{r.priority}</td>
                   <td className="truncate">{r.name}</td>

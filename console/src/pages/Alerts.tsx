@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Badge, Card, Drawer, Empty, ErrorBox, Labels, Loading, PageHead, Pager } from "../components/ui";
+import { Badge, Card, Drawer, Empty, ErrorBox, Labels, Loading, PageHead, Pager, activatable } from "../components/ui";
 import { ExportButton } from "../components/controls";
 import { api, type Alert, type FlowSummary, type Page } from "../lib/api";
 import { ago, dateTime, human } from "../lib/format";
@@ -41,7 +41,7 @@ export function Alerts() {
             <thead><tr><th>Severity</th><th>Status</th><th>Alert</th><th>Labels</th><th>Source</th><th className="num">Flows</th><th className="num">Blocked</th><th>Last seen</th></tr></thead>
             <tbody>
               {data.items.map((a) => (
-                <tr key={a.id} className={`clickable ${String(a.id) === alertId ? "selected" : ""}`} onClick={() => nav(`/alerts/${a.id}`)}>
+                <tr key={a.id} className={`clickable ${String(a.id) === alertId ? "selected" : ""}`} onClick={() => nav(`/alerts/${a.id}`)} {...activatable(() => nav(`/alerts/${a.id}`))}>
                   <td><Badge kind={a.severity} dot /></td>
                   <td><Badge kind={a.status} /></td>
                   <td className="truncate">{a.title}{a.summary_source === "llm" && <span className="badge c-ai" style={{ marginLeft: 6 }}>AI</span>}</td>

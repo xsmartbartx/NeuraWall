@@ -68,7 +68,7 @@ export function Billing() {
             <dt>Enforcement nodes</dt>
             <dd>
               <div className="row" style={{ flexWrap: "nowrap" }}>
-                <div style={{ flex: 1, minWidth: 120 }}><Meter value={nodeShare} warn={nodeShare >= 1} /></div>
+                <div style={{ flex: 1, minWidth: 120 }}><Meter value={nodeShare} warn={nodeShare >= 1} label="Enforcement nodes used" /></div>
                 <span className="mono">{usage.nodes} / {plan.nodes_limit ?? "∞"}</span>
               </div>
             </dd>
@@ -79,7 +79,7 @@ export function Billing() {
               {plan.llm_access === "own_key" && <>Your own Anthropic key <span className="faint">(billed by Anthropic; {usage.llm_calls.toLocaleString()} calls this month)</span></>}
               {plan.llm_access === "included" && usage.llm_budget !== null && (
                 <div className="row" style={{ flexWrap: "nowrap" }}>
-                  <div style={{ flex: 1, minWidth: 120 }}><Meter value={usage.llm_calls / usage.llm_budget} warn={usage.llm_calls >= usage.llm_budget} /></div>
+                  <div style={{ flex: 1, minWidth: 120 }}><Meter value={usage.llm_calls / usage.llm_budget} warn={usage.llm_calls >= usage.llm_budget} label="Claude calls used this month" /></div>
                   <span className="mono">{usage.llm_calls.toLocaleString()} / {usage.llm_budget.toLocaleString()} calls this month</span>
                 </div>
               )}

@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Erase a person: `DELETE /users/{id}` and an Erase action on the Users page. The audit trail now records people as
+  `user:<id>` instead of an email, so erasing is possible without breaking the hash chain. Older entries may still
+  hold an email (see docs/security.md).
+- Console keyboard access: table rows that open a drawer take Tab, Enter and Space; dialogs move focus in, keep Tab
+  inside, close on Escape and return focus; the verdict chart has a text summary and meters are progress bars.
 - Linked mode (optional): an installation can belong to one NEXORA organisation. The plan is pulled from
   NEXORA, usage events (counts only) go back through an outbox (queued in memory, persisted within about 15 s, retried; a crash can lose the last few seconds), and a plan change never changes
   what nodes enforce. See [docs/nexora.md](docs/nexora.md).

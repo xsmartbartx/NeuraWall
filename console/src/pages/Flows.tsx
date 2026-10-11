@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Badge, Card, Drawer, Empty, ErrorBox, Labels, Loading, PageHead, Pager } from "../components/ui";
+import { Badge, Card, Drawer, Empty, ErrorBox, Labels, Loading, PageHead, Pager, activatable } from "../components/ui";
 import { ExportButton } from "../components/controls";
 import { api, type FlowDetail, type FlowSummary, type Page } from "../lib/api";
 import { bytes, dateTime, human } from "../lib/format";
@@ -21,7 +21,7 @@ export function FlowTable({ items, compact, onSelect, selected }: {
       <tbody>
         {items.map((f) => (
           <tr key={f.flow_id} className={`${onSelect ? "clickable" : ""} ${selected === f.flow_id ? "selected" : ""}`}
-            onClick={() => onSelect?.(f.flow_id)}>
+            onClick={() => onSelect?.(f.flow_id)} {...(onSelect ? activatable(() => onSelect(f.flow_id)) : {})}>
             <td className="mono muted">{dateTime(f.ts)}</td>
             <td><Badge kind={f.enforced ? f.action : f.action === "allow" ? "allow" : "alert"}>{human(f.action)}{f.enforced ? "" : f.action !== "allow" && f.action !== "alert" ? " (alert-only)" : ""}</Badge></td>
             <td className="mono">{f.src_ip}</td>

@@ -174,3 +174,20 @@ as formulas (hostnames and alert titles come from network traffic an attacker co
 viewer for 30 minutes (20 per hour per address). It is for a **separate demo instance** and the server refuses
 to start unless `demo_mode` is on, and refuses if the instance is linked to NEXORA, has Stripe keys or a Claude
 API key. If an administrator changes the demo account's role or deactivates it, the button stops working.
+
+
+## Audit trail and erasing a person
+
+The audit trail is hash-chained, so an entry can never be edited or removed. To make erasing a person possible,
+**new entries never contain an email**: people are recorded as `user:<id>` (system actors such as a node id or `stripe`
+are unchanged), and details that used to carry an email (a created user, an alert assignee) record a role or the
+same id instead.
+
+`DELETE /api/v1/users/{id}` (admins) erases a person: their email, name, sign-in provider id and password are replaced,
+they are signed out, and the email is replaced in the other places that record who did something (rule drafts,
+enrollment tokens, webhook channels, alert assignees). The user row and its id stay, so history keeps its shape and
+`audit/verify` still passes. You cannot erase yourself, someone already erased, or the last active administrator.
+
+Limits, stated plainly: audit entries written **before** this change may still hold the email, and cannot be edited.
+Rule definitions store `created_by` and `approved_by` inside their stored JSON, which erasure does not rewrite. Treat
+those as a retention question for the organisation, not something this feature guarantees.

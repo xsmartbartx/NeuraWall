@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { num } from "../lib/format";
+import { activatable } from "./ui";
 
 type Point = { ts: number; allow: number; alert: number; blocked: number };
 
@@ -22,9 +23,14 @@ export function VerdictTimeline({ points, bucket }: { points: Point[]; bucket: n
   const fmt = (ts: number) => new Date(ts * 1000).toLocaleTimeString(undefined, bucket >= 3600
     ? { hour: "2-digit" } : { hour: "2-digit", minute: "2-digit" });
 
+  const totals = points.reduce((a, p) => ({ allow: a.allow + p.allow, alert: a.alert + p.alert, blocked: a.blocked + p.blocked }), { allow: 0, alert: 0, blocked: 0 });
+  const summary = points.length
+    ? `Verdicts over time, ${points.length} intervals: ${num(totals.allow)} allowed, ${num(totals.alert)} alerted, ${num(totals.blocked)} blocked. Busiest interval ${num(max)} flows.`
+    : "Verdicts over time: no traffic in this window.";
+
   return (
     <div className="chart" onMouseLeave={() => setTip(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Verdicts over time">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary}>
         {ticks.map((t) => (
           <g key={t}>
             <line className="grid-line" x1={L} x2={W} y1={y(t)} y2={y(t)} />
@@ -71,7 +77,8 @@ export function BarList({ items, color = "var(--alert)", onClick }: {
   return (
     <div className="bar-list">
       {items.map((i) => (
-        <div key={i.label} className="item" style={{ cursor: onClick ? "pointer" : undefined }} onClick={() => onClick?.(i.label)}>
+        <div key={i.label} className="item" style={{ cursor: onClick ? "pointer" : undefined }} onClick={() => onClick?.(i.label)}
+          {...(onClick ? { role: "button", ...activatable(() => onClick(i.label)) } : {})}>
           <span className="mono truncate">{i.label}</span>
           <span className="mono muted">{num(i.value)}</span>
           <div className="track"><div className="fill" style={{ width: `${(i.value / max) * 100}%`, background: color }} /></div>

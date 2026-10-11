@@ -17,6 +17,7 @@ export function Users() {
   const { run, busy } = useAction();
   const { data, error, reload } = useApi<UserRow[]>("/users");
   const [creating, setCreating] = useState(false);
+  const [erasing, setErasing] = useState<UserRow | null>(null);
   const [form, setForm] = useState({ email: "", name: "", role: "analyst", password: "" });
   const [temp, setTemp] = useState<{ email: string; password: string } | null>(null);
 
@@ -44,6 +45,7 @@ export function Users() {
                   <td className="muted">{ago(u.last_login)}</td>
                   <td className="row" style={{ flexWrap: "nowrap" }}>
                     {u.id !== me?.id && <button className="small" disabled={busy} onClick={() => patch(u, { active: !u.active })}>{u.active ? "Disable" : "Enable"}</button>}
+                    {u.id !== me?.id && !u.email.endsWith("@erased.invalid") && <button className="small danger" disabled={busy} onClick={() => setErasing(u)}>Erase</button>}
                     {u.auth_provider === "local" && <button className="small" disabled={busy} onClick={async () => {
                       const r = await run(() => api<{ temporary_password: string }>(`/users/${u.id}/reset-password`, { method: "POST" }));
                       if (r) { setTemp({ email: u.email, password: r.temporary_password }); reload(); }
@@ -76,6 +78,15 @@ export function Users() {
         <Modal title="Temporary password" onClose={() => setTemp(null)} footer={<button className="primary" onClick={() => setTemp(null)}>Done</button>}>
           <p style={{ margin: 0 }}>Share this with <b>{temp.email}</b> over a secure channel. It is shown once and must be changed at next sign-in.</p>
           <div className="row"><code style={{ fontSize: 15 }}>{temp.password}</code><Copy text={temp.password} /></div>
+        </Modal>
+      )}
+      {erasing && (
+        <Modal title={`Erase ${erasing.email}?`} onClose={() => setErasing(null)} footer={<>
+          <button onClick={() => setErasing(null)}>Cancel</button>
+          <button className="danger" disabled={busy} onClick={async () => { await run(() => api(`/users/${erasing.id}`, { method: "DELETE" }), "User erased"); setErasing(null); reload(); }}>Erase user</button>
+        </>}>
+          <p style={{ margin: 0 }}>This removes their email, name and sign-in for good, and signs them out. Their history stays, shown as <span className="mono">user:{erasing.id}</span>. It cannot be undone.</p>
+          <p className="faint" style={{ margin: 0, fontSize: 12 }}>Audit entries written before this version may still contain their email: the audit trail cannot be edited.</p>
         </Modal>
       )}
     </>

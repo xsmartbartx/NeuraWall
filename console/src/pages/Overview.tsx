@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BarList, VerdictTimeline } from "../components/charts";
-import { Badge, Card, ErrorBox, Kpi, Loading, PageHead, Meter } from "../components/ui";
+import { Badge, Card, ErrorBox, Kpi, Loading, PageHead, Meter, activatable } from "../components/ui";
 import type { Alert, Dashboard, Page } from "../lib/api";
 import { ago, num, pct } from "../lib/format";
 import { useApi, useAuth } from "../lib/hooks";
@@ -111,7 +111,7 @@ export function Overview() {
                 <thead><tr><th>Severity</th><th>Alert</th><th>Source</th><th className="num">Flows</th><th>Last seen</th></tr></thead>
                 <tbody>
                   {alerts.items.map((a) => (
-                    <tr key={a.id} className="clickable" onClick={() => nav(`/alerts/${a.id}`)}>
+                    <tr key={a.id} className="clickable" onClick={() => nav(`/alerts/${a.id}`)} {...activatable(() => nav(`/alerts/${a.id}`))}>
                       <td><Badge kind={a.severity} dot /></td>
                       <td className="truncate">{a.title}</td>
                       <td className="mono">{a.src_ip}</td>

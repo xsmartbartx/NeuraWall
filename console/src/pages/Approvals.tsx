@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Badge, Card, Drawer, Empty, ErrorBox, Loading, Meter, Modal, PageHead } from "../components/ui";
+import { Badge, Card, Drawer, Empty, ErrorBox, Loading, Meter, Modal, PageHead, activatable } from "../components/ui";
 import { api, type DraftRow, type Mode, type Rule, type RuleMatch, type Simulation } from "../lib/api";
 import { ago, dateTime, human, matchSummary, pct } from "../lib/format";
 import { useAction, useApi, useAuth } from "../lib/hooks";
@@ -34,7 +34,7 @@ export function Approvals() {
               {data.map((d) => {
                 const sim = d.draft.simulation;
                 return (
-                  <tr key={d.id} className={`clickable ${d.id === draftId ? "selected" : ""}`} onClick={() => nav(`/approvals/${d.id}`)}>
+                  <tr key={d.id} className={`clickable ${d.id === draftId ? "selected" : ""}`} onClick={() => nav(`/approvals/${d.id}`)} {...activatable(() => nav(`/approvals/${d.id}`))}>
                     <td><Badge kind={d.status} /></td>
                     <td className="truncate">{d.draft.name}</td>
                     <td><Badge kind={d.draft.action} /></td>
