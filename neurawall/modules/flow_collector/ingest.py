@@ -115,6 +115,42 @@ def _direction(conn: dict[str, Any]) -> Direction:
     return Direction.OUTBOUND
 
 
+def _l7_sections(
+    conn: dict[str, Any],
+    dns: dict[str, Any] | None,
+    ssl: dict[str, Any] | None,
+    http: dict[str, Any] | None,
+    ua_by_host: dict[str, str] | None,
+) -> dict[str, Any]:
+    l7: dict[str, Any] = {}
+    if dns and dns.get("query"):
+        l7["dns"] = DnsMeta(
+            qname=dns["query"],
+            qtype=str(dns.get("qtype_name") or "A")[:10],
+            rcode=str(dns.get("rcode_name") or "NOERROR")[:16],
+            answers=len(dns.get("answers") or []),
+        ).model_dump()
+    if http:
+        l7["http"] = HttpMeta(
+            method=str(http.get("method") or "GET")[:16],
+            host=http.get("host"),
+            path=str(http.get("uri") or "/")[:2048],
+            user_agent=(http.get("user_agent") or None),
+            status=http.get("status_code"),
+            body_len=int(http.get("request_body_len") or 0),
+        ).model_dump()
+    if ssl:
+        ua = (http or {}).get("user_agent") or (ua_by_host or {}).get(conn[_ORIG_H])
+        l7["tls"] = TlsMeta(
+            sni=ssl.get("server_name") or None,
+            version=ssl.get("version"),
+            ja3=ssl.get("ja3"),
+            ja4=ssl.get("ja4"),
+            claimed_client=claimed_client(ua),
+        ).model_dump()
+    return l7
+
+
 def zeek_to_flow(
     conn: dict[str, Any],
     dns: dict[str, Any] | None,
@@ -145,32 +181,7 @@ def zeek_to_flow(
     }
     if doc["flow_id"] is None:
         del doc["flow_id"]
-    l7: dict[str, Any] = {}
-    if dns and dns.get("query"):
-        l7["dns"] = DnsMeta(
-            qname=dns["query"],
-            qtype=str(dns.get("qtype_name") or "A")[:10],
-            rcode=str(dns.get("rcode_name") or "NOERROR")[:16],
-            answers=len(dns.get("answers") or []),
-        ).model_dump()
-    if http:
-        l7["http"] = HttpMeta(
-            method=str(http.get("method") or "GET")[:16],
-            host=http.get("host"),
-            path=str(http.get("uri") or "/")[:2048],
-            user_agent=(http.get("user_agent") or None),
-            status=http.get("status_code"),
-            body_len=int(http.get("request_body_len") or 0),
-        ).model_dump()
-    if ssl:
-        ua = (http or {}).get("user_agent") or (ua_by_host or {}).get(conn[_ORIG_H])
-        l7["tls"] = TlsMeta(
-            sni=ssl.get("server_name") or None,
-            version=ssl.get("version"),
-            ja3=ssl.get("ja3"),
-            ja4=ssl.get("ja4"),
-            claimed_client=claimed_client(ua),
-        ).model_dump()
+    l7 = _l7_sections(conn, dns, ssl, http, ua_by_host)
     if l7:
         doc["l7"] = L7Meta.model_validate(l7).model_dump()
     return doc

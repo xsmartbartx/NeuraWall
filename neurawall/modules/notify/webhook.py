@@ -49,8 +49,8 @@ def _resolve(host: str, port: int) -> list[str]:
     return sorted({str(info[4][0]) for info in infos})
 
 
-def check_url(url: str, *, resolver: Resolver = _resolve) -> tuple[str, str, int, list[str]]:
-    """Validate `url` and return (host, path-and-query, port, checked addresses)."""
+def _checked_host_and_port(url: str) -> tuple[str, str, int]:
+    """Syntax checks on the URL itself: returns (host, path-and-query, port)."""
     if len(url) > 500 or any(ord(c) < 33 or ord(c) == 127 for c in url):
         raise ValidationFailure("the webhook URL is not valid")
     parts = urlsplit(url)
@@ -71,19 +71,29 @@ def check_url(url: str, *, resolver: Resolver = _resolve) -> tuple[str, str, int
         port = parts.port or 443
     except ValueError as exc:
         raise ValidationFailure("the webhook URL has an invalid port") from exc
+    path = parts.path or "/"
+    if parts.query:
+        path += "?" + parts.query
+    return host, path, port
+
+
+def _require_public(addr: str) -> None:
+    ip = ipaddress.ip_address(addr)
+    # IPv4-mapped IPv6 (::ffff:10.0.0.1) must be judged as the IPv4 address it carries.
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    if not ip.is_global or ip.is_multicast:
+        raise ValidationFailure("the webhook host must be a public internet address")
+
+
+def check_url(url: str, *, resolver: Resolver = _resolve) -> tuple[str, str, int, list[str]]:
+    """Validate `url` and return (host, path-and-query, port, checked addresses)."""
+    host, path, port = _checked_host_and_port(url)
     addresses = resolver(host, port)
     if not addresses:
         raise ValidationFailure("the webhook host does not resolve")
     for addr in addresses:
-        ip = ipaddress.ip_address(addr)
-        # IPv4-mapped IPv6 (::ffff:10.0.0.1) must be judged as the IPv4 address it carries.
-        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
-            ip = ip.ipv4_mapped
-        if not ip.is_global or ip.is_multicast:
-            raise ValidationFailure("the webhook host must be a public internet address")
-    path = parts.path or "/"
-    if parts.query:
-        path += "?" + parts.query
+        _require_public(addr)
     return host, path, port, addresses
 
 

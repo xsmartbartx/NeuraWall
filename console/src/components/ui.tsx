@@ -134,7 +134,7 @@ function useDialog<T extends HTMLElement>(onClose: () => void) {
       if (e.key !== "Tab" || !node) return;
       const list = items();
       if (!list.length) { e.preventDefault(); return; }
-      const first = list[0]!, last = list[list.length - 1]!;
+      const first = list[0]!, last = list.at(-1)!;
       if (e.shiftKey && (document.activeElement === first || document.activeElement === node)) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
       else if (!node.contains(document.activeElement)) { e.preventDefault(); first.focus(); }

@@ -11,7 +11,7 @@ export function Approvals() {
   const { can } = useAuth();
   const [status, setStatus] = useState("pending");
   const [creating, setCreating] = useState(false);
-  const { data, error, reload } = useApi<DraftRow[]>(`/drafts${status ? `?status=${status}` : ""}`, { poll: 10000 });
+  const { data, error, reload } = useApi<DraftRow[]>("/drafts" + (status ? "?status=" + status : ""), { poll: 10000 });
 
   return (
     <>

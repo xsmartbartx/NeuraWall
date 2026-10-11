@@ -7,6 +7,7 @@ SQL comments collapsed and whitespace normalised *before* any pattern is applied
 from __future__ import annotations
 
 import re
+from typing import Any
 from urllib.parse import unquote_plus
 
 from neurawall.core.models import FlowRecord, ThreatLabel
@@ -77,6 +78,15 @@ def normalise(path: str) -> str:
     return _WS.sub(" ", s)
 
 
+def _pattern_hits(text: str, patterns: Any) -> list[tuple[str, float, str | float | None]]:
+    hits: list[tuple[str, float, str | float | None]] = []
+    for name, pattern, weight in patterns:
+        m = pattern.search(text)
+        if m:
+            hits.append((name, weight, m.group(0)))
+    return hits
+
+
 def detect(flow: FlowRecord) -> list[Finding]:
     http = flow.l7.http if flow.l7 else None
     if http is None:
@@ -85,20 +95,17 @@ def detect(flow: FlowRecord) -> list[Finding]:
     scanner = bool(http.user_agent and _SCANNER_UA.search(http.user_agent))
     findings: list[Finding] = []
     for label, patterns, bias in _GROUPS:
-        evidence: list[tuple[str, float, str | float | None]] = []
-        for name, pattern, weight in patterns:
-            m = pattern.search(text)
-            if m:
-                evidence.append((name, weight, m.group(0)))
+        evidence = _pattern_hits(text, patterns)
         if not evidence:
             continue
         weights = [w for _, w, _ in evidence]
+        extras: list[tuple[str, float, str | float | None]] = []
         if scanner:
-            evidence.append(("scanner_user_agent", 1.5, http.user_agent))
-            weights.append(1.5)
+            extras.append(("scanner_user_agent", 1.5, http.user_agent))
         if http.status and http.status >= 500:
-            evidence.append(("server_error_response", 0.5, float(http.status)))
-            weights.append(0.5)
+            extras.append(("server_error_response", 0.5, float(http.status)))
+        evidence += extras
+        weights += [w for _, w, _ in extras]
         conf = calibrated(weights, bias)
         if conf >= 0.3:
             findings.append(Finding(label, round(conf, 4), "injection", evidence))

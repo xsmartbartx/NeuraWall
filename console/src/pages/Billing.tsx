@@ -139,7 +139,7 @@ export function Billing() {
           if (current) action = <span className="faint">Your plan</span>;
           else if (canBuy) action = <button className="primary" disabled={busy} onClick={() => checkout(p.id)}>Upgrade to {p.name}</button>;
           else if (b.linked && b.manage_url && p.price_cents_month > 0 && p.self_serve) action = <a className="btn" href={b.manage_url} target="_blank" rel="noopener noreferrer">Change in NEXORA</a>;
-          else if (p.price_cents_month > 0) action = <a className="btn" href={`${SALES}${encodeURIComponent(`NeuraWall ${p.name}`)}`}>Contact sales</a>;
+          else if (p.price_cents_month > 0) action = <a className="btn" href={SALES + encodeURIComponent("NeuraWall " + p.name)}>Contact sales</a>;
           return (
             <div key={p.id} className="card kpi" style={{ gap: 10, borderColor: current ? "var(--accent)" : undefined }}>
               <div className="row"><b>{p.name}</b>{current && <Badge kind="active">current</Badge>}</div>
