@@ -110,8 +110,9 @@ def test_fallbacks_can_be_disabled(stub):
 
 def test_refusal_is_recoverable(stub):
     stub.stop_reason = "refusal"
+    be = backend()
     with pytest.raises(RecoverableError, match="declined"):
-        backend().generate("t", "c", schemas.LlmRuleDraft)
+        be.generate("t", "c", schemas.LlmRuleDraft)
 
 
 def test_workspace_header_is_sent_when_configured(stub):

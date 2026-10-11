@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { Badge, Card, Copy, ErrorBox, Loading, Modal, PageHead } from "../components/ui";
+import { Async, Badge, Card, Copy, Modal, PageHead } from "../components/ui";
 import { api, type UserRow } from "../lib/api";
 import { ago } from "../lib/format";
 import { useAction, useApi, useAuth } from "../lib/hooks";
@@ -29,7 +29,7 @@ export function Users() {
     <>
       <PageHead title="Users" desc="Role-based access. Approving rule changes is a separate permission from authoring them." actions={<button className="primary" onClick={() => setCreating(true)}>Add user</button>} />
       <Card pad={false}>
-        {error ? <div className="card-body"><ErrorBox error={error} /></div> : !data ? <Loading /> : (
+        <Async error={error} data={data}>{(data) => (
           <div className="table-wrap"><table>
             <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last sign-in</th><th /></tr></thead>
             <tbody>
@@ -55,7 +55,7 @@ export function Users() {
               ))}
             </tbody>
           </table></div>
-        )}
+        )}</Async>
       </Card>
       <Card title="Roles">
         <dl className="kv">{ROLES.map(([r, d]) => <Fragment key={r}><dt className="mono">{r}</dt><dd>{d}</dd></Fragment>)}</dl>

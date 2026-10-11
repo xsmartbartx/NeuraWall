@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, ErrorBox, Loading, PageHead, Pager } from "../components/ui";
+import { Async, Card, PageHead, Pager } from "../components/ui";
 import { ExportButton } from "../components/controls";
 import { api, type AuditRow, type Page } from "../lib/api";
 import { dateTime } from "../lib/format";
@@ -35,7 +35,7 @@ export function Audit() {
           {["draft.", "rule.", "bundle.", "node.", "user.", "auth.", "alert."].map((p) => <option key={p} value={p}>{p}*</option>)}
         </select>
       }>
-        {error ? <div className="card-body"><ErrorBox error={error} /></div> : !data ? <Loading /> : (
+        <Async error={error} data={data}>{(data) => (
           <div className="table-wrap"><table>
             <thead><tr><th className="num">#</th><th>Time</th><th>Actor</th><th>Action</th><th>Target</th><th>Detail</th><th>Hash</th></tr></thead>
             <tbody>
@@ -46,13 +46,13 @@ export function Audit() {
                   <td>{a.actor}</td>
                   <td className="mono">{a.action}</td>
                   <td className="mono">{a.target}</td>
-                  <td className="mono faint truncate" style={{ maxWidth: 360 }} title={JSON.stringify(a.detail)}>{Object.entries(a.detail).filter(([, v]) => v !== null && v !== "").map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(" ")}</td>
+                  <td className="mono faint truncate" style={{ maxWidth: 360 }} title={JSON.stringify(a.detail)}>{Object.entries(a.detail).filter(([, v]) => v !== null && v !== "").map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`).join(" ")}</td>
                   <td className="mono faint">{a.hash.slice(0, 10)}…</td>
                 </tr>
               ))}
             </tbody>
           </table></div>
-        )}
+        )}</Async>
         {data && <Pager total={data.total} limit={LIMIT} offset={offset} onChange={setOffset} />}
       </Card>
     </>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Badge, Card, Copy, Empty, ErrorBox, Loading, Modal, PageHead } from "../components/ui";
+import { Async, Badge, Card, Copy, Empty, Modal, PageHead } from "../components/ui";
 import { api, type NodeRow } from "../lib/api";
 import { ago } from "../lib/format";
 import { useAction, useApi, useAuth } from "../lib/hooks";
@@ -31,7 +31,7 @@ export function Fleet() {
         )}
       />
       <Card pad={false}>
-        {error ? <div className="card-body"><ErrorBox error={error} /></div> : !data ? <Loading /> : !data.length ? (
+        <Async error={error} data={data}>{(data) => !data.length ? (
           <Empty>No nodes enrolled yet. Enroll a node to start enforcing policy at the edge.</Empty>
         ) : (
           <div className="table-wrap"><table>
@@ -52,7 +52,7 @@ export function Fleet() {
               ))}
             </tbody>
           </table></div>
-        )}
+        )}</Async>
       </Card>
       {token && install && (
         <Modal title="Enroll a node" onClose={() => setToken(null)} footer={<button className="primary" onClick={() => { setToken(null); reload(); }}>Done</button>}>

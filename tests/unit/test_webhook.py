@@ -30,8 +30,9 @@ def resolves(*addrs):
     ],
 )
 def test_malformed_or_unsafe_urls_are_refused(url):
+    resolver = resolves(PUBLIC)
     with pytest.raises(ValidationFailure):
-        check_url(url, resolver=resolves(PUBLIC))
+        check_url(url, resolver=resolver)
 
 
 @pytest.mark.parametrize(
@@ -54,19 +55,22 @@ def test_malformed_or_unsafe_urls_are_refused(url):
     ],
 )
 def test_names_that_resolve_to_internal_addresses_are_refused(address):
+    resolver = resolves(address)
     with pytest.raises(ValidationFailure, match="public"):
-        check_url("https://hooks.example.com/x", resolver=resolves(address))
+        check_url("https://hooks.example.com/x", resolver=resolver)
 
 
 def test_one_internal_answer_among_public_ones_is_enough_to_refuse():
     """DNS rebinding sets up a name with both a public and an internal record."""
+    resolver = resolves(PUBLIC, "10.1.1.1")
     with pytest.raises(ValidationFailure):
-        check_url("https://hooks.example.com/x", resolver=resolves(PUBLIC, "10.1.1.1"))
+        check_url("https://hooks.example.com/x", resolver=resolver)
 
 
 def test_unresolvable_hosts_are_refused():
+    resolver = resolves()
     with pytest.raises(ValidationFailure, match="resolve"):
-        check_url("https://nope.example.com/x", resolver=resolves())
+        check_url("https://nope.example.com/x", resolver=resolver)
 
 
 def test_a_public_https_url_passes_and_keeps_path_query_and_port():
@@ -151,25 +155,29 @@ def test_a_redirect_is_not_followed_and_counts_as_failure():
 
 @pytest.mark.parametrize("status", [400, 404, 500, 503])
 def test_non_2xx_is_a_failure(status):
+    rx = Receiver(status=status)
     with pytest.raises(WebhookError, match=str(status)):
-        send(Receiver(status=status))
+        send(rx)
 
 
 def test_network_errors_are_failures_not_crashes():
+    rx = Receiver(raises=httpx.ConnectTimeout("slow"))
     with pytest.raises(WebhookError, match="unreachable"):
-        send(Receiver(raises=httpx.ConnectTimeout("slow")))
+        send(rx)
 
 
 def test_an_address_that_turned_internal_is_never_contacted():
     rx = Receiver()
+    resolver = resolves("10.0.0.9")
     with pytest.raises(ValidationFailure):
-        send(rx, resolver=resolves("10.0.0.9"))
+        send(rx, resolver=resolver)
     assert rx.requests == []
 
 
 def test_an_oversized_payload_is_refused():
+    rx = Receiver()
     with pytest.raises(ValidationFailure, match="too large"):
-        send(Receiver(), payload={"x": "a" * 70_000})
+        send(rx, payload={"x": "a" * 70_000})
 
 
 @pytest.mark.parametrize(

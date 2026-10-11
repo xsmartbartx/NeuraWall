@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Badge, Card, Drawer, Empty, ErrorBox, Loading, Meter, Modal, PageHead, activatable } from "../components/ui";
+import { Async, Badge, Card, Drawer, Empty, ErrorBox, Loading, Meter, Modal, PageHead, activatable } from "../components/ui";
 import { api, type DraftRow, type Mode, type Rule, type RuleMatch, type Simulation } from "../lib/api";
 import { ago, dateTime, human, matchSummary, pct } from "../lib/format";
 import { useAction, useApi, useAuth } from "../lib/hooks";
@@ -25,7 +25,7 @@ export function Approvals() {
           {["pending", "approved", "rejected", ""].map((s) => <button key={s} className={status === s ? "on" : ""} onClick={() => setStatus(s)}>{s || "all"}</button>)}
         </div>
       }>
-        {error ? <div className="card-body"><ErrorBox error={error} /></div> : !data ? <Loading /> : !data.length ? (
+        <Async error={error} data={data}>{(data) => !data.length ? (
           <Empty>{status === "pending" ? "Nothing awaiting approval." : "No drafts."}</Empty>
         ) : (
           <div className="table-wrap"><table>
@@ -47,7 +47,7 @@ export function Approvals() {
               })}
             </tbody>
           </table></div>
-        )}
+        )}</Async>
       </Card>
       {draftId && <DraftDrawer id={draftId} onClose={() => nav("/approvals")} onChange={reload} />}
       {creating && <NewDraftModal onClose={() => setCreating(false)} onCreated={(id) => { setCreating(false); reload(); nav(`/approvals/${id}`); }} />}

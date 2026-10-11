@@ -58,9 +58,10 @@ def test_default_is_community_with_one_node_and_offline_ai(env):
         agent_version="1",
         backend="dry-run",
     )
+    token = cp.create_enrollment_token("a")
     with pytest.raises(Exception, match="includes 1 enforcement node"):
         cp.enroll_node(
-            cp.create_enrollment_token("a"),
+            token,
             name="n2",
             hostname="",
             agent_version="1",

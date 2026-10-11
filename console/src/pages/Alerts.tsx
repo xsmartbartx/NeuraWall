@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Badge, Card, Drawer, Empty, ErrorBox, Labels, Loading, PageHead, Pager, activatable } from "../components/ui";
+import { Async, Badge, Card, Drawer, Empty, ErrorBox, Labels, Loading, PageHead, Pager, activatable } from "../components/ui";
 import { ExportButton } from "../components/controls";
 import { api, type Alert, type FlowSummary, type Page } from "../lib/api";
 import { ago, dateTime, human } from "../lib/format";
@@ -36,7 +36,7 @@ export function Alerts() {
           {data && <span className="muted">{data.total} alerts</span>}
         </div>
       }>
-        {error ? <div className="card-body"><ErrorBox error={error} /></div> : !data ? <Loading /> : !data.items.length ? <Empty>No alerts match.</Empty> : (
+        <Async error={error} data={data}>{(data) => !data.items.length ? <Empty>No alerts match.</Empty> : (
           <div className="table-wrap"><table>
             <thead><tr><th>Severity</th><th>Status</th><th>Alert</th><th>Labels</th><th>Source</th><th className="num">Flows</th><th className="num">Blocked</th><th>Last seen</th></tr></thead>
             <tbody>
@@ -54,7 +54,7 @@ export function Alerts() {
               ))}
             </tbody>
           </table></div>
-        )}
+        )}</Async>
         {data && <Pager total={data.total} limit={LIMIT} offset={offset} onChange={setOffset} />}
       </Card>
       {alertId && <AlertDrawer id={Number(alertId)} onClose={() => nav("/alerts")} onChange={reload} />}

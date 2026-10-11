@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Badge, Card, Drawer, Empty, ErrorBox, Labels, Loading, PageHead, Pager, activatable } from "../components/ui";
+import { Async, Badge, Card, Drawer, Empty, ErrorBox, Labels, Loading, PageHead, Pager, activatable } from "../components/ui";
 import { ExportButton } from "../components/controls";
 import { api, type FlowDetail, type FlowSummary, type Page } from "../lib/api";
 import { bytes, dateTime, human } from "../lib/format";
@@ -83,8 +83,8 @@ export function Flows() {
           {data && <span className="muted right">{data.total.toLocaleString()} flows</span>}
         </form>
       }>
-        {error ? <div className="card-body"><ErrorBox error={error} /></div> : !data ? <Loading /> :
-          <FlowTable items={data.items} onSelect={setSelected} selected={selected} />}
+        <Async error={error} data={data}>{(data) =>
+          <FlowTable items={data.items} onSelect={setSelected} selected={selected} />}</Async>
         {data && <Pager total={data.total} limit={LIMIT} offset={offset} onChange={(o) => {
           const next = new URLSearchParams(params); next.set("offset", String(o)); setParams(next);
         }} />}

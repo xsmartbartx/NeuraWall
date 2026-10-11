@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Badge, Card, ErrorBox, Loading, Meter, Modal, PageHead } from "../components/ui";
+import { Async, Badge, Card, Meter, Modal, PageHead } from "../components/ui";
 import { api, type Bundle } from "../lib/api";
 import { ago } from "../lib/format";
 import { useAction, useApi, useAuth } from "../lib/hooks";
@@ -19,7 +19,7 @@ export function Bundles() {
         actions={can("rules:approve") && <button disabled={busy} onClick={async () => { if (await run(() => api("/bundles/publish", { method: "POST" }), "Bundle published")) reload(); }}>Publish now</button>}
       />
       <Card pad={false}>
-        {error ? <div className="card-body"><ErrorBox error={error} /></div> : !data ? <Loading /> : (
+        <Async error={error} data={data}>{(data) => (
           <div className="table-wrap"><table>
             <thead><tr><th>Version</th><th>Status</th><th style={{ width: 180 }}>Rollout</th><th className="num">Rules</th><th>Note</th><th>Published</th><th>Signing key</th><th /></tr></thead>
             <tbody>
@@ -40,7 +40,7 @@ export function Bundles() {
               ))}
             </tbody>
           </table></div>
-        )}
+        )}</Async>
       </Card>
       {rollback && (
         <Modal title={`Roll back v${rollback.version}?`} onClose={() => setRollback(null)} footer={<>

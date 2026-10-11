@@ -87,8 +87,9 @@ def test_signature_verification():
     assert not verify_signature(body + b" ", sign(body, "whsec"), "whsec")
     assert not verify_signature(body, sign(body, "whsec", int(time.time()) - 600), "whsec")
     assert not verify_signature(body, "garbage", "whsec")
+    sig = sign(body, "x")
     with pytest.raises(BillingProviderError):
-        verify_signature(body, sign(body, "x"), "")
+        verify_signature(body, sig, "")
 
 
 def test_interpret_own_subscription():

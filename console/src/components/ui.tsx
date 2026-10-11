@@ -52,6 +52,14 @@ export function Empty({ children }: Readonly<{ children: ReactNode }>) {
   return <div className="empty">{children}</div>;
 }
 
+export function Async<T>({ error, data, children }: Readonly<{
+  error: string | null; data: T | null; children: (d: T) => ReactNode;
+}>) {
+  if (error) return <div className="card-body"><ErrorBox error={error} /></div>;
+  if (!data) return <Loading />;
+  return <>{children(data)}</>;
+}
+
 export function ErrorBox({ error }: Readonly<{ error: string }>) {
   return <div className="callout danger">{error}</div>;
 }

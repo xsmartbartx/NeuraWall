@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { deliveryBadge, deliveryLabel } from "../lib/labels";
 import { Badge, Card, Empty, ErrorBox, Loading, Modal, PageHead } from "../components/ui";
 import { NexoraCard } from "../components/NexoraCard";
 import { SecretReveal, Toggle } from "../components/controls";
@@ -61,7 +62,7 @@ export function Integrations() {
                   <td className="mono">{c.url_hint}</td>
                   <td>{c.events.map((e) => human(e.replace(".", " "))).join(", ")}{c.events.includes("alert.created") && <span className="faint"> · {c.min_severity}+</span>}</td>
                   <td>{c.last_delivery
-                    ? <><Badge kind={c.last_delivery.status === "sent" ? "active" : c.last_delivery.status === "dead" ? "revoked" : "pending"}>{c.last_delivery.status === "sent" ? "delivered" : c.last_delivery.status === "dead" ? "failed" : "retrying"}</Badge> <span className="faint">{ago(c.last_delivery.at)}</span></>
+                    ? <><Badge kind={deliveryBadge(c.last_delivery.status)}>{deliveryLabel(c.last_delivery.status, "failed")}</Badge> <span className="faint">{ago(c.last_delivery.at)}</span></>
                     : <span className="faint">never</span>}</td>
                   <td><Toggle checked={c.active} disabled={busy} label={c.active ? "On" : "Paused"}
                     onChange={async (v) => { await run(() => api(`/notifications/channels/${c.id}`, { method: "PATCH", json: { active: v } })); reload(); }} /></td>
@@ -89,7 +90,7 @@ export function Integrations() {
                   <td className="muted">{ago(d.sent_at ?? d.created_at)}</td>
                   <td>{names.get(d.channel_id) ?? `#${d.channel_id}`}</td>
                   <td>{human(d.event_type.replace(".", " "))} <span className="faint mono">{d.ref}</span></td>
-                  <td>{d.status === "sent" ? <Badge kind="active">delivered</Badge> : d.status === "dead" ? <Badge kind="revoked">gave up</Badge> : <Badge kind="pending">retrying</Badge>} {d.error && <span className="faint">{d.error}</span>}</td>
+                  <td><Badge kind={deliveryBadge(d.status)}>{deliveryLabel(d.status, "gave up")}</Badge> {d.error && <span className="faint">{d.error}</span>}</td>
                   <td className="num">{d.attempts}</td>
                 </tr>
               ))}

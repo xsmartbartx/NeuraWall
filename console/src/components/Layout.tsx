@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { advisorBadge } from "../lib/labels";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import type { Dashboard } from "../lib/api";
 import { useApi, useAuth, useTheme } from "../lib/hooks";
@@ -66,7 +67,7 @@ export function Layout() {
           <span className="spacer" />
           {dash && (
             <span className="row" style={{ fontSize: 12 }}>
-              <span className={`badge dot c-${dash.advisor_mode === "online" ? "llm" : dash.advisor_mode === "degraded" ? "alert" : "info"}`}>
+              <span className={`badge dot c-${advisorBadge(dash.advisor_mode)}`}>
                 Tier 3 {dash.advisor_mode}
               </span>
               <span className="badge dot c-active">bundle v{dash.bundle_version}</span>
