@@ -145,32 +145,41 @@ class AnomalyEngine:
         raw = -self._forest.score_samples(feats)  # higher = more anomalous, ~0.35..0.8
         return np.clip((raw - self._offset) * 6.0, -6, 6)
 
-    def _score_one(self, flow: FlowRecord, x: np.ndarray, forest_logit: float) -> AnomalyScore:
-        contributions: dict[str, float] = {}
-
-        # Isolation forest, attributed to the most deviant features (robust z-score).
+    def _forest_signal(
+        self, x: np.ndarray, forest_logit: float, contributions: dict[str, float]
+    ) -> float:
+        """Isolation forest, attributed to the most deviant features (robust z-score)."""
         forest = _sigmoid(forest_logit) if self._forest is not None else 0.0
         if forest > 0.5:
             dev = np.abs(x - self._median) / self._mad
             for idx in np.argsort(dev)[::-1][:3]:
                 if dev[idx] > 2:
                     contributions[FEATURE_NAMES[idx]] = float(forest * min(dev[idx], 20) / 20)
+        return forest
 
-        # EWMA volume baseline.
+    def _volume_signal(
+        self, flow: FlowRecord, x: np.ndarray, contributions: dict[str, float]
+    ) -> float:
+        """EWMA volume baseline."""
         key = (flow.src_ip, flow.dst_port, hour_of_week(flow.ts_start))
         base = self._baselines.get(key)
         z = base.zscore(x[0]) if base else 0.0
         volume = _sigmoid(abs(z) - 4.0) if z > 0 else 0.0
         if volume > 0.3:
             contributions["volume_vs_baseline"] = volume
+        return volume
 
-        # DNS entropy: > ~3.8 bits in a label is unusual for human-chosen names.
+    @staticmethod
+    def _entropy_signal(x: np.ndarray, contributions: dict[str, float]) -> float:
+        """DNS entropy: > ~3.8 bits in a label is unusual for human-chosen names."""
         ent = float(x[FEATURE_NAMES.index("dns_label_entropy")])
         entropy = _sigmoid((ent - 3.8) * 4.0) if ent else 0.0
         if entropy > 0.3:
             contributions["dns_label_entropy"] = entropy
+        return entropy
 
-        # Connection-rate change per source.
+    def _rate_signal(self, x: np.ndarray, contributions: dict[str, float]) -> float:
+        """Connection-rate change per source."""
         rate_x = float(x[FEATURE_NAMES.index("src_conn_rate")])
         conns_per_min = math.expm1(rate_x)
         flood = 0.0
@@ -181,6 +190,14 @@ class AnomalyEngine:
         rate = max(flood, _sigmoid((port_ent - 4.0) * 3.0))
         if rate > 0.3:
             contributions["connection_rate"] = rate
+        return rate
+
+    def _score_one(self, flow: FlowRecord, x: np.ndarray, forest_logit: float) -> AnomalyScore:
+        contributions: dict[str, float] = {}
+        forest = self._forest_signal(x, forest_logit, contributions)
+        volume = self._volume_signal(flow, x, contributions)
+        entropy = self._entropy_signal(x, contributions)
+        rate = self._rate_signal(x, contributions)
 
         parts = [forest, volume, entropy, rate]
         # Noisy-OR: independent weak signals accumulate; any strong one dominates.

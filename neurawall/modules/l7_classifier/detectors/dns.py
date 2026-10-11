@@ -6,7 +6,7 @@ import math
 import re
 from collections import Counter, OrderedDict, deque
 
-from neurawall.core.models import FlowRecord, ThreatLabel
+from neurawall.core.models import DnsMeta, FlowRecord, ThreatLabel
 from neurawall.modules.l7_classifier.detectors.base import Finding, calibrated
 
 # Most frequent English letter bigrams; human-chosen domain labels are rich in them.
@@ -311,21 +311,17 @@ class DnsDetector:
         return detect(flow, nxdomain_burst=burst)
 
 
-def detect(flow: FlowRecord, *, nxdomain_burst: int = 0) -> list[Finding]:
-    dns = flow.l7.dns if flow.l7 else None
-    if dns is None:
-        return []
-    labels = dns.qname.split(".")
+_Evidence = list[tuple[str, float, str | float | None]]
+
+
+def _dga_evidence(dns: DnsMeta, labels: list[str], nxdomain_burst: int) -> _Evidence:
+    """The registrable label itself looks machine-generated."""
     tld = labels[-1]
     sld = labels[-2] if len(labels) >= 2 else labels[0]
-    subdomain = ".".join(labels[:-2])
-    findings: list[Finding] = []
-
-    # --- DGA: the registrable label itself looks machine-generated -------------------
     ent = _entropy(sld)
     bigram = _bigram_score(sld)
     digits = sum(ch.isdigit() for ch in sld) / max(len(sld), 1)
-    ev: list[tuple[str, float, str | float | None]] = []
+    ev: _Evidence = []
     if len(sld) >= 12:
         ev.append(("long_registrable_label", 1.0, float(len(sld))))
     if ent > 3.5:
@@ -343,14 +339,14 @@ def detect(flow: FlowRecord, *, nxdomain_burst: int = 0) -> list[Finding]:
         ev.append(("source_nxdomain_burst", min(nxdomain_burst / 5, 3.0), float(nxdomain_burst)))
     if tld in _SUSPICIOUS_TLDS:
         ev.append(("suspicious_tld", 0.8, tld))
-    if ev:
-        conf = calibrated([w for _, w, _ in ev], -4.5)
-        if conf >= 0.3:
-            findings.append(Finding(ThreatLabel.DGA, round(conf, 4), "dga", ev))
+    return ev
 
-    # --- Tunnelling: data encoded into long subdomains ---------------------------------
-    ev = []
+
+def _tunnel_evidence(dns: DnsMeta, labels: list[str]) -> _Evidence:
+    """Data encoded into long subdomains."""
+    subdomain = ".".join(labels[:-2])
     longest = max((len(x) for x in labels[:-2]), default=0)
+    ev: _Evidence = []
     if len(subdomain) > 40:
         ev.append(("long_subdomain", min((len(subdomain) - 40) / 10, 4.0), float(len(subdomain))))
     if longest >= 30:
@@ -361,8 +357,22 @@ def detect(flow: FlowRecord, *, nxdomain_burst: int = 0) -> list[Finding]:
         ev.append(("tunnel_qtype", 1.2, dns.qtype))
     if len(labels) > 5:
         ev.append(("many_labels", 0.8, float(len(labels))))
-    if ev:
-        conf = calibrated([w for _, w, _ in ev], -4.0)
+    return ev
+
+
+def detect(flow: FlowRecord, *, nxdomain_burst: int = 0) -> list[Finding]:
+    dns = flow.l7.dns if flow.l7 else None
+    if dns is None:
+        return []
+    labels = dns.qname.split(".")
+    findings: list[Finding] = []
+    for label, kind, bias, ev in (
+        (ThreatLabel.DGA, "dga", -4.5, _dga_evidence(dns, labels, nxdomain_burst)),
+        (ThreatLabel.DNS_TUNNEL, "dns_tunnel", -4.0, _tunnel_evidence(dns, labels)),
+    ):
+        if not ev:
+            continue
+        conf = calibrated([w for _, w, _ in ev], bias)
         if conf >= 0.3:
-            findings.append(Finding(ThreatLabel.DNS_TUNNEL, round(conf, 4), "dns_tunnel", ev))
+            findings.append(Finding(label, round(conf, 4), kind, ev))
     return findings

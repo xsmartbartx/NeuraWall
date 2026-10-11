@@ -350,6 +350,46 @@ class ControlPlane:
         self.audit(user.email, "auth.login", f"user:{user.id}")
         return token, user
 
+    def _sso_user(
+        self, s: Session, identity: SsoIdentity, denied: PolicyViolation
+    ) -> tuple[db.User, bool]:
+        """The local user for a verified identity, linking or provisioning one if allowed.
+        Returns (user, provisioned)."""
+        auth = self.settings.auth
+        user = s.scalars(select(db.User).where(db.User.external_id == identity.subject)).first()
+        if user is not None:
+            return user, False
+        user = s.scalars(select(db.User).where(db.User.email == identity.email)).first()
+        if user is not None:
+            if user.external_id is not None:
+                raise denied  # that email belongs to a different provider identity
+            if auth.sso_jit and not identity.email_verified:
+                raise denied  # strict mode: an unverified email proves nothing
+            # Bind the provider id only when the email is verified. A token that does
+            # not say so still signs in as before (the identity provider is required
+            # to verify emails) but cannot claim the account for its own subject.
+            if identity.email_verified:
+                user.external_id = identity.subject
+            return user, False
+        if not (auth.sso_jit and identity.email_verified and identity.org_id):
+            raise denied
+        user = db.User(
+            email=identity.email,
+            name=identity.name or identity.email.split("@")[0],
+            role=Role.VIEWER.value,
+            # Nobody knows this password: it is random and never shown.
+            password_hash=hash_password(secrets.token_urlsafe(48) + "aA1!"),
+            external_id=identity.subject,
+            auth_provider="nexora",
+        )
+        s.add(user)
+        try:
+            s.flush()
+        except IntegrityError:
+            # A second sign-in for the same identity won the race; they retry.
+            raise denied from None
+        return user, True
+
     def login_sso(self, identity: SsoIdentity) -> tuple[str, db.User]:
         """Sign in from a verified identity-provider token.
 
@@ -358,40 +398,8 @@ class ControlPlane:
         organisation gets a `viewer`. A role is never taken from the token."""
         auth = self.settings.auth
         denied = PolicyViolation("single sign-on was not accepted")
-        provisioned = False
         with self.db.session() as s:
-            user = s.scalars(select(db.User).where(db.User.external_id == identity.subject)).first()
-            if user is None:
-                user = s.scalars(select(db.User).where(db.User.email == identity.email)).first()
-                if user is not None:
-                    if user.external_id is not None:
-                        raise denied  # that email belongs to a different provider identity
-                    if auth.sso_jit and not identity.email_verified:
-                        raise denied  # strict mode: an unverified email proves nothing
-                    # Bind the provider id only when the email is verified. A token that does
-                    # not say so still signs in as before (the identity provider is required
-                    # to verify emails) but cannot claim the account for its own subject.
-                    if identity.email_verified:
-                        user.external_id = identity.subject
-                elif auth.sso_jit and identity.email_verified and identity.org_id:
-                    user = db.User(
-                        email=identity.email,
-                        name=identity.name or identity.email.split("@")[0],
-                        role=Role.VIEWER.value,
-                        # Nobody knows this password: it is random and never shown.
-                        password_hash=hash_password(secrets.token_urlsafe(48) + "aA1!"),
-                        external_id=identity.subject,
-                        auth_provider="nexora",
-                    )
-                    s.add(user)
-                    try:
-                        s.flush()
-                    except IntegrityError:
-                        # A second sign-in for the same identity won the race; they retry.
-                        raise denied from None
-                    provisioned = True
-                else:
-                    raise denied
+            user, provisioned = self._sso_user(s, identity, denied)
             if not user.active:
                 raise denied
             user.last_login = time.time()
@@ -981,28 +989,7 @@ class ControlPlane:
                 if f.flow_id in existing:
                     continue
                 existing.add(f.flow_id)
-                row = db.FlowRow(
-                    flow_id=f.flow_id,
-                    node_id=node_id,
-                    ts=f.ts_start,
-                    src_ip=f.src_ip,
-                    dst_ip=f.dst_ip,
-                    dst_port=f.dst_port,
-                    protocol=f.protocol.value,
-                    bytes_total=f.bytes_out + f.bytes_in,
-                    action=v.action.value,
-                    enforced=v.enforced,
-                    rule_id=v.rule_id,
-                    anomaly_score=v.anomaly_score,
-                    labels=",".join(sorted({x.value for x in v.labels}))[:200],
-                    host=f.sni or f.dns_qname or (f.l7.http.host if f.l7 and f.l7.http else None),
-                    flow=f.model_dump(mode="json"),
-                    signals={
-                        "anomaly": ev.anomaly.model_dump(mode="json") if ev.anomaly else None,
-                        "classifications": [c.model_dump(mode="json") for c in ev.classifications],
-                    },
-                    verdict=v.model_dump(mode="json"),
-                )
+                row = self._flow_row(node_id, ev, v)
                 if v.action != Action.ALLOW:
                     alert_id, wants_tier3 = self._attach_alert(s, node_id, ev, v)
                     row.alert_id = alert_id
@@ -1010,10 +997,39 @@ class ControlPlane:
                         tier3.append(alert_id)
                 s.add(row)
         for alert_id in tier3:
-            try:
-                self._tier3.put_nowait(alert_id)
-            except queue.Full:
-                log.warning("tier3 queue full; alert triage deferred", alert_id=alert_id)
+            self._queue_tier3(alert_id)
+
+    def _queue_tier3(self, alert_id: int) -> None:
+        try:
+            self._tier3.put_nowait(alert_id)
+        except queue.Full:
+            log.warning("tier3 queue full; alert triage deferred", alert_id=alert_id)
+
+    @staticmethod
+    def _flow_row(node_id: str, ev: Evidence, v: Verdict) -> db.FlowRow:
+        f = ev.flow
+        return db.FlowRow(
+            flow_id=f.flow_id,
+            node_id=node_id,
+            ts=f.ts_start,
+            src_ip=f.src_ip,
+            dst_ip=f.dst_ip,
+            dst_port=f.dst_port,
+            protocol=f.protocol.value,
+            bytes_total=f.bytes_out + f.bytes_in,
+            action=v.action.value,
+            enforced=v.enforced,
+            rule_id=v.rule_id,
+            anomaly_score=v.anomaly_score,
+            labels=",".join(sorted({x.value for x in v.labels}))[:200],
+            host=f.sni or f.dns_qname or (f.l7.http.host if f.l7 and f.l7.http else None),
+            flow=f.model_dump(mode="json"),
+            signals={
+                "anomaly": ev.anomaly.model_dump(mode="json") if ev.anomaly else None,
+                "classifications": [c.model_dump(mode="json") for c in ev.classifications],
+            },
+            verdict=v.model_dump(mode="json"),
+        )
 
     def _attach_alert(self, s: Session, node_id: str, ev: Evidence, v: Verdict) -> tuple[int, bool]:
         f = ev.flow
@@ -1770,7 +1786,18 @@ class ControlPlane:
         batch = []
         while self._notify_queue:
             batch.append(self._notify_queue.popleft())
-        now = time.time()
+        self._enqueue_deliveries(batch)
+        delivered = 0
+        for delivery_id, channel_id, payload, attempts in self._due_deliveries(time.time()):
+            with self.db.session() as s:
+                channel = s.get(db.NotificationChannel, channel_id)
+                if channel is None or not channel.active:
+                    continue
+                url, secret = channel.url, self._channel_secret(channel)
+            delivered += self._attempt_delivery(delivery_id, attempts, url, secret, payload)
+        return delivered
+
+    def _enqueue_deliveries(self, batch: list[Any]) -> None:
         with self.db.session() as s:
             channels = list(
                 s.scalars(
@@ -1801,8 +1828,10 @@ class ControlPlane:
                                 next_try_at=ts,
                             )
                         )
+
+    def _due_deliveries(self, now: float) -> list[tuple[int, int, dict[str, Any], int]]:
         with self.db.session() as s:
-            due = [
+            return [
                 (d.id, d.channel_id, d.payload, d.attempts)
                 for d in s.scalars(
                     select(db.NotificationDelivery)
@@ -1814,37 +1843,35 @@ class ControlPlane:
                     .limit(50)
                 ).all()
             ]
-        delivered = 0
-        for delivery_id, channel_id, payload, attempts in due:
-            with self.db.session() as s:
-                channel = s.get(db.NotificationChannel, channel_id)
-                if channel is None or not channel.active:
-                    continue
-                url, secret = channel.url, self._channel_secret(channel)
-            status: int | None = None
-            error: str | None = None
-            dead = False
-            try:
-                status = send_webhook(url, secret, payload, now=time.time(), **self._send_kwargs())
-            except ValidationFailure as exc:
-                error, dead = exc.message[:200], True  # the address is not allowed: do not retry
-            except WebhookError as exc:
-                error = exc.message[:200]
-            with self.db.session() as s:
-                row = s.get(db.NotificationDelivery, delivery_id)
-                if row is None:
-                    continue
-                row.attempts = attempts + 1
-                row.http_status = status
-                row.error = error
-                if error is None:
-                    row.status, row.sent_at = "sent", time.time()
-                    delivered += 1
-                elif dead or row.attempts >= self.NOTIFY_MAX_ATTEMPTS:
-                    row.status = "dead"
-                else:
-                    row.next_try_at = time.time() + min(3600, 30 * 2**row.attempts)
-        return delivered
+
+    def _attempt_delivery(
+        self, delivery_id: int, attempts: int, url: str, secret: str, payload: dict[str, Any]
+    ) -> int:
+        """Send one delivery and record the outcome. Returns 1 if it was delivered, else 0."""
+        status: int | None = None
+        error: str | None = None
+        dead = False
+        try:
+            status = send_webhook(url, secret, payload, now=time.time(), **self._send_kwargs())
+        except ValidationFailure as exc:
+            error, dead = exc.message[:200], True  # the address is not allowed: do not retry
+        except WebhookError as exc:
+            error = exc.message[:200]
+        with self.db.session() as s:
+            row = s.get(db.NotificationDelivery, delivery_id)
+            if row is None:
+                return 0
+            row.attempts = attempts + 1
+            row.http_status = status
+            row.error = error
+            if error is None:
+                row.status, row.sent_at = "sent", time.time()
+                return 1
+            if dead or row.attempts >= self.NOTIFY_MAX_ATTEMPTS:
+                row.status = "dead"
+            else:
+                row.next_try_at = time.time() + min(3600, 30 * 2**row.attempts)
+        return 0
 
     def _notify_loop(self) -> None:
         while not self._stop.wait(5):
