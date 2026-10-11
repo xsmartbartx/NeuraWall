@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { verdictKind } from "../lib/labels";
 import { Link, useSearchParams } from "react-router-dom";
 import { Async, Badge, Card, Drawer, Empty, ErrorBox, Labels, Loading, PageHead, Pager, activatable } from "../components/ui";
 import { ExportButton } from "../components/controls";
@@ -7,6 +8,9 @@ import { bytes, dateTime, human } from "../lib/format";
 import { useAction, useApi, useAuth } from "../lib/hooks";
 
 const LIMIT = 100;
+
+const alertOnlyNote = (f: { action: string; enforced: boolean }) =>
+  !f.enforced && f.action !== "allow" && f.action !== "alert" ? " (alert-only)" : "";
 
 export function FlowTable({ items, compact, onSelect, selected }: Readonly<{
   items: FlowSummary[]; compact?: boolean; onSelect?: (id: string) => void; selected?: string | null;
@@ -23,7 +27,7 @@ export function FlowTable({ items, compact, onSelect, selected }: Readonly<{
           <tr key={f.flow_id} className={`${onSelect ? "clickable" : ""} ${selected === f.flow_id ? "selected" : ""}`}
             onClick={() => onSelect?.(f.flow_id)} {...(onSelect ? activatable(() => onSelect(f.flow_id)) : {})}>
             <td className="mono muted">{dateTime(f.ts)}</td>
-            <td><Badge kind={f.enforced ? f.action : f.action === "allow" ? "allow" : "alert"}>{human(f.action)}{f.enforced ? "" : f.action !== "allow" && f.action !== "alert" ? " (alert-only)" : ""}</Badge></td>
+            <td><Badge kind={verdictKind(f.action, f.enforced)}>{human(f.action)}{alertOnlyNote(f)}</Badge></td>
             <td className="mono">{f.src_ip}</td>
             <td className="mono">{f.dst_ip}:{f.dst_port}/{f.protocol}</td>
             {!compact && <td className="truncate mono" style={{ maxWidth: 220 }}>{f.host ?? "—"}</td>}
@@ -109,7 +113,7 @@ function FlowDrawer({ id, onClose }: Readonly<{ id: string; onClose: () => void 
           <div className="callout">
             <div className="row" style={{ marginBottom: 6 }}>
               <h3>Verdict</h3>
-              <Badge kind={f.verdict.enforced ? f.verdict.action : f.verdict.action === "allow" ? "allow" : "alert"}>{human(f.verdict.action)}</Badge>
+              <Badge kind={verdictKind(f.verdict.action, f.verdict.enforced)}>{human(f.verdict.action)}</Badge>
               {f.verdict.enforced ? <Badge kind="block">enforced</Badge> : <span className="faint">not enforced</span>}
               {f.verdict.rule_id && <span className="mono">{f.verdict.rule_id}</span>}
             </div>

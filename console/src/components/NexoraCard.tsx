@@ -16,7 +16,8 @@ export function NexoraCard() {
   if (error) return <Card title="NEXORA"><ErrorBox error={error} /></Card>;
   if (!n) return <Card title="NEXORA"><Loading /></Card>;
   if (!n.linked) return <Card title="NEXORA"><p className="muted" style={{ margin: 0 }}>This installation is not linked to a NEXORA organisation. Set <code>NEURAWALL_NEXORA__API_KEY</code> to link it: the plan then comes from NEXORA.</p></Card>;
-  const state = n.error ? (n.last_ok ? "grace" : "error") : "linked";
+  let state = "linked";
+  if (n.error) state = n.last_ok ? "grace" : "error";
   return (
     <Card title={<div className="row"><h2>NEXORA</h2><Badge kind={linkBadge(state)} dot>{linkLabel(state)}</Badge></div>}>
       <dl className="kv">
