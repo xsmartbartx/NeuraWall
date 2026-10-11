@@ -16,6 +16,19 @@ export function Rules() {
   const [cleanup, setCleanup] = useState<HygieneFinding | null>(null);
   const [deleting, setDeleting] = useState<Rule | null>(null);
   const canEdit = can("rules:approve");
+  const disableRedundant = async (rule: Rule | undefined) => {
+    if (rule) {
+      await patch(rule, { enabled: false }, `${rule.id} disabled`);
+    }
+    setCleanup(null);
+    reloadHygiene();
+  };
+  const lastMatch = (id: string) => {
+    if (!stats) return "…";
+    const m = stats.rules[id];
+    if (!m) return <span className="faint" title={`No flow matched this rule in the last ${days} days`}>never</span>;
+    return ago(m.last_match);
+  };
   const findingsFor = (id: string) => hygiene?.filter((h) => h.rule_id === id) ?? [];
 
   const patch = async (r: Rule, body: Partial<Rule>, msg: string) => {
@@ -29,7 +42,7 @@ export function Rules() {
       {hygiene && hygiene.length > 0 && (
         <div className="callout warn">
           <b>Rule-set hygiene:</b> {hygiene.length} finding{hygiene.length > 1 ? "s" : ""}.
-          <ul className="list-plain" style={{ marginTop: 6 }}>{hygiene.map((h, i) => <li key={i}><span className="mono">{h.rule_id}</span> — <b>{human(h.kind)}</b>: {h.detail}{canEdit && (h.kind === "redundant" || h.kind === "shadowed") && (data ?? []).find((r) => r.id === h.rule_id)?.enabled && <> <button className="small" disabled={busy} onClick={() => setCleanup(h)}>Clean up…</button></>}</li>)}</ul>
+          <ul className="list-plain" style={{ marginTop: 6 }}>{hygiene.map((h) => <li key={`${h.rule_id}-${h.kind}-${h.related_rule_id ?? ""}`}><span className="mono">{h.rule_id}</span> — <b>{human(h.kind)}</b>: {h.detail}{canEdit && (h.kind === "redundant" || h.kind === "shadowed") && (data ?? []).find((r) => r.id === h.rule_id)?.enabled && <> <button className="small" disabled={busy} onClick={() => setCleanup(h)}>Clean up…</button></>}</li>)}</ul>
         </div>
       )}
       <Card pad={false}>
@@ -46,7 +59,7 @@ export function Rules() {
                   <td><Badge kind={r.mode} /></td>
                   <td className="mono truncate faint" style={{ maxWidth: 300 }}>{matchSummary(r.match as Record<string, unknown>).join(" · ")}</td>
                   <td className="num">{stats ? (stats.rules[r.id]?.matches ?? 0).toLocaleString() : "…"}</td>
-                  <td className="muted">{stats ? (stats.rules[r.id] ? ago(stats.rules[r.id]!.last_match) : <span className="faint" title={`No flow matched this rule in the last ${days} days`}>never</span>) : "…"}</td>
+                  <td className="muted">{lastMatch(r.id)}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={r.enabled} disabled={!canEdit || busy} aria-label={`Enable ${r.id}`}
                       onChange={() => patch(r, { enabled: !r.enabled }, `${r.id} ${r.enabled ? "disabled" : "enabled"}`)} />
@@ -63,13 +76,13 @@ export function Rules() {
         return (
           <Modal title={`Disable ${cleanup.rule_id}?`} onClose={() => setCleanup(null)} footer={<>
             <button onClick={() => setCleanup(null)}>Cancel</button>
-            <button className="primary" disabled={busy || !rule} onClick={async () => { if (rule) await patch(rule, { enabled: false }, `${rule.id} disabled`); setCleanup(null); reloadHygiene(); }}>Disable rule</button>
+            <button className="primary" disabled={busy || !rule} onClick={() => disableRedundant(rule)}>Disable rule</button>
           </>}>
             <p style={{ margin: 0 }}>{cleanup.detail}</p>
             <p style={{ margin: 0 }}>Because the earlier rule takes all of this rule's traffic first, disabling it changes no verdict. It stays in the list, and you can turn it back on. Disabling publishes a new signed bundle and is recorded in the audit trail.</p>
             {n > 0
-              ? <div className="callout warn" role="status">It did match {n.toLocaleString()} flow{n === 1 ? "" : "s"} in the last {days} days. That can happen if the covering rule was added or enabled recently. Check before you disable it.</div>
-              : <div className="callout" role="status">No flow matched it in the last {days} days, which agrees with the finding.</div>}
+              ? <output className="callout warn">It did match {n.toLocaleString()} flow{n === 1 ? "" : "s"} in the last {days} days. That can happen if the covering rule was added or enabled recently. Check before you disable it.</output>
+              : <output className="callout">No flow matched it in the last {days} days, which agrees with the finding.</output>}
           </Modal>
         );
       })()}
@@ -116,7 +129,7 @@ export function Rules() {
 }
 
 /** The rule replayed against recent traffic, on demand (it replays up to 20,000 flows). */
-function RuleImpact({ ruleId, matches, days }: { ruleId: string; matches: number; days: number }) {
+function RuleImpact({ ruleId, matches, days }: Readonly<{ ruleId: string; matches: number; days: number }>) {
   const { run, busy } = useAction();
   const [sim, setSim] = useState<Simulation | null>(null);
   return (
