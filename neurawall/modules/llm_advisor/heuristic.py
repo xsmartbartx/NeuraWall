@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import time
 from collections import Counter
+from dataclasses import dataclass
 
 from neurawall.core.models import Evidence, Rule, ThreatLabel, Verdict
 from neurawall.modules.llm_advisor import schemas
@@ -94,64 +95,97 @@ def _host(ip: str) -> str:
     return f"{ip}/128" if ":" in ip else f"{ip}/32"
 
 
+_INJECTION_LABELS = (
+    ThreatLabel.SQL_INJECTION,
+    ThreatLabel.COMMAND_INJECTION,
+    ThreatLabel.TEMPLATE_INJECTION,
+    ThreatLabel.PATH_TRAVERSAL,
+    ThreatLabel.XSS,
+)
+
+
+@dataclass
+class _Indicators:
+    evs: list[Evidence]
+    dsts: Counter[str]
+    ports: Counter[int]
+    top_src: str
+    top_dst: str
+
+
+def _draft_injection(label: ThreatLabel, ind: _Indicators) -> tuple[schemas.LlmRuleMatch, str, str]:
+    m = _empty_match()
+    m.labels = [label.value]
+    m.min_label_confidence = 0.8
+    m.dst_cidrs = [_host(d) for d, _ in ind.dsts.most_common(4)]
+    return m, "drop", f"Block {label.value.replace('_', ' ')} to {ind.top_dst}"
+
+
+def _draft_dns(label: ThreatLabel, ind: _Indicators) -> tuple[schemas.LlmRuleMatch, str, str]:
+    m = _empty_match()
+    names = [ev.flow.dns_qname for ev in ind.evs if ev.flow.dns_qname]
+    if label == ThreatLabel.DNS_TUNNEL and names:
+        m.dns_suffixes = sorted({_registrable(n) for n in names})[:8]
+        return m, "drop", f"Block DNS tunnel via {m.dns_suffixes[0]}"
+    m.labels = [label.value]
+    m.min_label_confidence = 0.8
+    m.src_cidrs = [_host(ind.top_src)]
+    return m, "quarantine", f"Quarantine DGA-infected host {ind.top_src}"
+
+
+def _draft_channel(label: ThreatLabel, ind: _Indicators) -> tuple[schemas.LlmRuleMatch, str, str]:
+    m = _empty_match()
+    m.dst_cidrs = [_host(d) for d, _ in ind.dsts.most_common(4)]
+    snis = sorted({ev.flow.sni for ev in ind.evs if ev.flow.sni})
+    if snis:
+        m.sni_suffixes = snis[:4]
+    what = "C2 channel" if label == ThreatLabel.C2_BEACON else "exfiltration"
+    return m, "drop", f"Block {what} to {ind.top_dst}"
+
+
+def _draft_tls_mismatch(
+    label: ThreatLabel, ind: _Indicators
+) -> tuple[schemas.LlmRuleMatch, str, str]:
+    m = _empty_match()
+    ja3 = sorted(
+        {
+            ev.flow.l7.tls.ja3
+            for ev in ind.evs
+            if ev.flow.l7 and ev.flow.l7.tls and ev.flow.l7.tls.ja3
+        }
+    )
+    m.ja3 = ja3[:4]
+    m.labels = [label.value]
+    return m, "alert", "Alert on spoofed browser TLS fingerprint"
+
+
+def _draft_novel(ind: _Indicators) -> tuple[schemas.LlmRuleMatch, str, str]:
+    """Novel / anomaly-only: narrowest scope that covers the evidence."""
+    m = _empty_match()
+    m.src_cidrs = [_host(ind.top_src)]
+    if len(ind.ports) <= 3:
+        m.dst_ports = sorted(ind.ports)
+    m.min_anomaly_score = 0.8
+    return m, "rate_limit", f"Rate-limit anomalous traffic from {ind.top_src}"
+
+
 def draft_rule(evs: list[Evidence], rules: list[Rule]) -> schemas.LlmRuleDraft:
     label, conf = _dominant(evs)
     srcs = Counter(ev.flow.src_ip for ev in evs)
     dsts = Counter(ev.flow.dst_ip for ev in evs)
     ports = Counter(ev.flow.dst_port for ev in evs)
-    m = _empty_match()
     top_src, top_dst = srcs.most_common(1)[0][0], dsts.most_common(1)[0][0]
-    action = "drop"
-    name = "Contain anomalous traffic"
-
-    if label in (
-        ThreatLabel.SQL_INJECTION,
-        ThreatLabel.COMMAND_INJECTION,
-        ThreatLabel.TEMPLATE_INJECTION,
-        ThreatLabel.PATH_TRAVERSAL,
-        ThreatLabel.XSS,
-    ):
-        m.labels = [label.value]
-        m.min_label_confidence = 0.8
-        m.dst_cidrs = [_host(d) for d, _ in dsts.most_common(4)]
-        name = f"Block {label.value.replace('_', ' ')} to {top_dst}"
+    ind = _Indicators(evs, dsts, ports, top_src, top_dst)
+    if label in _INJECTION_LABELS:
+        m, action, name = _draft_injection(label, ind)
     elif label in (ThreatLabel.DGA, ThreatLabel.DNS_TUNNEL):
-        names = [ev.flow.dns_qname for ev in evs if ev.flow.dns_qname]
-        if label == ThreatLabel.DNS_TUNNEL and names:
-            m.dns_suffixes = sorted({_registrable(n) for n in names})[:8]
-            name = f"Block DNS tunnel via {m.dns_suffixes[0]}"
-        else:
-            m.labels = [label.value]
-            m.min_label_confidence = 0.8
-            m.src_cidrs = [_host(top_src)]
-            action = "quarantine"
-            name = f"Quarantine DGA-infected host {top_src}"
+        m, action, name = _draft_dns(label, ind)
     elif label in (ThreatLabel.C2_BEACON, ThreatLabel.EXFILTRATION):
-        m.dst_cidrs = [_host(d) for d, _ in dsts.most_common(4)]
-        snis = sorted({ev.flow.sni for ev in evs if ev.flow.sni})
-        if snis:
-            m.sni_suffixes = snis[:4]
-        name = f"Block {'C2 channel' if label == ThreatLabel.C2_BEACON else 'exfiltration'} to {top_dst}"
+        m, action, name = _draft_channel(label, ind)
     elif label == ThreatLabel.TLS_MISMATCH:
-        ja3 = sorted(
-            {
-                ev.flow.l7.tls.ja3
-                for ev in evs
-                if ev.flow.l7 and ev.flow.l7.tls and ev.flow.l7.tls.ja3
-            }
-        )
-        m.ja3 = ja3[:4]
-        m.labels = [label.value]
-        action = "alert"
-        name = "Alert on spoofed browser TLS fingerprint"
+        m, action, name = _draft_tls_mismatch(label, ind)
     else:
-        # Novel / anomaly-only: narrowest scope that covers the evidence.
-        m.src_cidrs = [_host(top_src)]
-        if len(ports) <= 3:
-            m.dst_ports = sorted(ports)
-        m.min_anomaly_score = 0.8
-        action = "rate_limit"
-        name = f"Rate-limit anomalous traffic from {top_src}"
+        m, action, name = _draft_novel(ind)
         conf = max((ev.anomaly.score for ev in evs if ev.anomaly), default=0.5) * 0.7
 
     covered = [r.id for r in rules if r.enabled and r.action.value == action]
