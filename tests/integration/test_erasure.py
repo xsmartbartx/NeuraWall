@@ -148,8 +148,9 @@ def test_the_last_active_administrator_cannot_be_erased(env):
     cp, c, h = env
     second = make_user(cp, c, h, "second@example.com", role="admin")
     cp.erase_user("someone@example.com", second)  # two admins: one may go
+    my_id = c.get("/api/v1/auth/me", headers=h).json()["id"]
     with pytest.raises(PolicyViolation, match="last active administrator"):
-        cp.erase_user("someone@example.com", c.get("/api/v1/auth/me", headers=h).json()["id"])
+        cp.erase_user("someone@example.com", my_id)
 
 
 def test_only_user_admins_can_erase(env):

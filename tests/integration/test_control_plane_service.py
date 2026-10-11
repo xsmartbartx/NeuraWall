@@ -141,8 +141,9 @@ def test_node_enrollment_and_signed_bundle(cp):
     assert bundle.version == 1
     assert len(bundle.rules) == 7
     forged = SignedEnvelope.model_validate(sign_with_other_key(env))
+    trusted = {kid: load_public_key(pem)}
     with pytest.raises(IntegrityFailure):
-        open_bundle(forged, {kid: load_public_key(pem)})
+        open_bundle(forged, trusted)
     cp.revoke_node("admin", node.id)
     with pytest.raises(PolicyViolation):
         cp.authenticate_node(api_key)

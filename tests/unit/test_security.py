@@ -37,14 +37,16 @@ def test_tampered_bundle_rejected():
     s = EphemeralSigner()
     env = sign_payload({"version": 3}, s)
     forged = env.model_copy(update={"payload": {"version": 4}})
+    trusted = _trusted(s)
     with pytest.raises(IntegrityFailure):
-        verify_envelope(forged, _trusted(s))
+        verify_envelope(forged, trusted)
 
 
 def test_untrusted_key_rejected():
     env = sign_payload({"v": 1}, EphemeralSigner())
+    other = _trusted(EphemeralSigner())
     with pytest.raises(IntegrityFailure):
-        verify_envelope(env, _trusted(EphemeralSigner()))
+        verify_envelope(env, other)
 
 
 def test_file_signer_persists_key(tmp_path):

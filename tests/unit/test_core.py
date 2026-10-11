@@ -51,16 +51,11 @@ def test_rule_match_requires_criterion():
 
 
 def test_rule_requires_rationale():
+    match = RuleMatch(dst_ports=[1])
     with pytest.raises(ValidationError):
-        Rule(
-            id="R-000001",
-            name="x",
-            rationale="",
-            action=Action.DROP,
-            match=RuleMatch(dst_ports=[1]),
-        )
+        Rule(id="R-000001", name="x", rationale="", action=Action.DROP, match=match)
     with pytest.raises(ValidationError):
-        Rule(id="bad", name="x", rationale="r", action=Action.DROP, match=RuleMatch(dst_ports=[1]))
+        Rule(id="bad", name="x", rationale="r", action=Action.DROP, match=match)
 
 
 def test_enforced_blocking_verdict_needs_rule_id():
