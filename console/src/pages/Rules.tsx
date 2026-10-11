@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Badge, Card, Drawer, ErrorBox, Loading, Modal, PageHead, activatable } from "../components/ui";
+import { Async, Badge, Card, Drawer, Modal, PageHead, activatable } from "../components/ui";
 import { api, type HygieneFinding, type Rule, type RuleStats, type Simulation } from "../lib/api";
 import { ago, dateTime, human, matchSummary } from "../lib/format";
 import { SimulationView } from "./Approvals";
@@ -46,7 +46,7 @@ export function Rules() {
         </div>
       )}
       <Card pad={false}>
-        {error ? <div className="card-body"><ErrorBox error={error} /></div> : !data ? <Loading /> : (
+        <Async error={error} data={data}>{(data) => (
           <div className="table-wrap"><table>
             <thead><tr><th>ID</th><th className="num">Priority</th><th>Name</th><th>Action</th><th>Mode</th><th>Match</th><th className="num">Matches ({days}d)</th><th>Last match</th><th>Enabled</th></tr></thead>
             <tbody>
@@ -68,7 +68,7 @@ export function Rules() {
               ))}
             </tbody>
           </table></div>
-        )}
+        )}</Async>
       </Card>
       {cleanup && (() => {
         const rule = (data ?? []).find((r) => r.id === cleanup.rule_id);
