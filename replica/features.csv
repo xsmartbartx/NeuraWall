@@ -33,7 +33,7 @@ TLS interception for L7 on encrypted traffic,detection,could,no,skip,rejected on
 SOC 2 / ISO 27001,compliance,could,yes,skip,process and audit rather than code
 Console text and form fields meet WCAG AA contrast (both themes),accessibility,should,yes,yes,"37 pairs per theme, 0 failures; new --border-input role"
 Claude usage per month visible to admins,billing,should,yes,yes,Billing page meter and GET /llm/usage
-Published detector evasion report (what Tier 2 catches and misses),detection,should,no,no,"fix #1, thin evidence (reviews.csv)"
-"""What we detect without decrypting"" page in docs and on the product page",docs,should,no,no,"fix #2, thin evidence"
+Published detector evasion report (what Tier 2 catches and misses),detection,should,no,yes,"docs/evasion-report.md, generated and pinned by tests; HTTP injection detector only"
+"""What we detect without decrypting"" page in docs and on the product page",docs,should,no,partial,"docs/encrypted-traffic.md written; the product page copy is on the NEXORA site"
 One-click cleanup draft from a rule hygiene finding,approvals,could,no,no,"fix #3, thin evidence"
 Blast radius and last-match count on the Rules page,approvals,could,no,no,"fix #4, thin evidence"
