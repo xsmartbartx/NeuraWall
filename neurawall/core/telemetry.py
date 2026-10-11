@@ -93,9 +93,13 @@ class Histogram(_Metric):
                 cumulative += c
                 lines.append(f"{self.name}_bucket{_fmt_labels(key, f'le="{bound}"')} {cumulative}")
             cumulative += counts[-1]
-            lines.append(f"{self.name}_bucket{_fmt_labels(key, 'le="+Inf"')} {cumulative}")
-            lines.append(f"{self.name}_sum{_fmt_labels(key)} {self._sums[key]}")
-            lines.append(f"{self.name}_count{_fmt_labels(key)} {cumulative}")
+            lines.extend(
+                [
+                    f"{self.name}_bucket{_fmt_labels(key, 'le="+Inf"')} {cumulative}",
+                    f"{self.name}_sum{_fmt_labels(key)} {self._sums[key]}",
+                    f"{self.name}_count{_fmt_labels(key)} {cumulative}",
+                ]
+            )
         return lines
 
 

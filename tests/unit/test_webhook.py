@@ -99,7 +99,8 @@ def test_signature_is_a_stable_hmac_over_timestamp_and_body():
 
 def test_secrets_are_derived_per_channel_and_per_server_key():
     a = derive_secret("server-key", "nonce-1")
-    assert a == derive_secret("server-key", "nonce-1") and a.startswith("whsec_")
+    assert a == derive_secret("server-key", "nonce-1")
+    assert a.startswith("whsec_")
     assert a != derive_secret("server-key", "nonce-2")
     assert a != derive_secret("other-key", "nonce-1")
 
