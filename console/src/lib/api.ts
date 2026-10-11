@@ -44,9 +44,10 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401 && !path.startsWith("/auth/login") && !path.startsWith("/auth/sso")) onUnauthorized();
-    const detail = Array.isArray(data.details) && data.details.length
-      ? `: ${data.details.map((d: { loc: string[]; msg: string }) => `${d.loc.join(".")} ${d.msg}`).join("; ")}`
-      : "";
+    const lines: string[] = Array.isArray(data.details)
+      ? data.details.map((d: { loc: string[]; msg: string }) => `${d.loc.join(".")} ${d.msg}`)
+      : [];
+    const detail = lines.length ? ": " + lines.join("; ") : "";
     throw new ApiError(res.status, data.error ?? "error", (data.message ?? res.statusText) + detail);
   }
   return data as T;

@@ -15,7 +15,10 @@ export interface SsoConfig {
 
 function randomState(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(24));
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const b64 = btoa(String.fromCodePoint(...bytes)).replaceAll("+", "-").replaceAll("/", "_");
+  let end = b64.length;
+  while (end > 0 && b64[end - 1] === "=") end--;
+  return b64.slice(0, end);
 }
 
 export function startSso(loginUrl: string): void {
