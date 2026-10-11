@@ -1778,7 +1778,18 @@ class ControlPlane:
         batch = []
         while self._notify_queue:
             batch.append(self._notify_queue.popleft())
-        now = time.time()
+        self._enqueue_deliveries(batch)
+        delivered = 0
+        for delivery_id, channel_id, payload, attempts in self._due_deliveries(time.time()):
+            with self.db.session() as s:
+                channel = s.get(db.NotificationChannel, channel_id)
+                if channel is None or not channel.active:
+                    continue
+                url, secret = channel.url, self._channel_secret(channel)
+            delivered += self._attempt_delivery(delivery_id, attempts, url, secret, payload)
+        return delivered
+
+    def _enqueue_deliveries(self, batch: list[Any]) -> None:
         with self.db.session() as s:
             channels = list(
                 s.scalars(
@@ -1809,8 +1820,10 @@ class ControlPlane:
                                 next_try_at=ts,
                             )
                         )
+
+    def _due_deliveries(self, now: float) -> list[tuple[int, int, dict[str, Any], int]]:
         with self.db.session() as s:
-            due = [
+            return [
                 (d.id, d.channel_id, d.payload, d.attempts)
                 for d in s.scalars(
                     select(db.NotificationDelivery)
@@ -1822,37 +1835,35 @@ class ControlPlane:
                     .limit(50)
                 ).all()
             ]
-        delivered = 0
-        for delivery_id, channel_id, payload, attempts in due:
-            with self.db.session() as s:
-                channel = s.get(db.NotificationChannel, channel_id)
-                if channel is None or not channel.active:
-                    continue
-                url, secret = channel.url, self._channel_secret(channel)
-            status: int | None = None
-            error: str | None = None
-            dead = False
-            try:
-                status = send_webhook(url, secret, payload, now=time.time(), **self._send_kwargs())
-            except ValidationFailure as exc:
-                error, dead = exc.message[:200], True  # the address is not allowed: do not retry
-            except WebhookError as exc:
-                error = exc.message[:200]
-            with self.db.session() as s:
-                row = s.get(db.NotificationDelivery, delivery_id)
-                if row is None:
-                    continue
-                row.attempts = attempts + 1
-                row.http_status = status
-                row.error = error
-                if error is None:
-                    row.status, row.sent_at = "sent", time.time()
-                    delivered += 1
-                elif dead or row.attempts >= self.NOTIFY_MAX_ATTEMPTS:
-                    row.status = "dead"
-                else:
-                    row.next_try_at = time.time() + min(3600, 30 * 2**row.attempts)
-        return delivered
+
+    def _attempt_delivery(
+        self, delivery_id: int, attempts: int, url: str, secret: str, payload: dict[str, Any]
+    ) -> int:
+        """Send one delivery and record the outcome. Returns 1 if it was delivered, else 0."""
+        status: int | None = None
+        error: str | None = None
+        dead = False
+        try:
+            status = send_webhook(url, secret, payload, now=time.time(), **self._send_kwargs())
+        except ValidationFailure as exc:
+            error, dead = exc.message[:200], True  # the address is not allowed: do not retry
+        except WebhookError as exc:
+            error = exc.message[:200]
+        with self.db.session() as s:
+            row = s.get(db.NotificationDelivery, delivery_id)
+            if row is None:
+                return 0
+            row.attempts = attempts + 1
+            row.http_status = status
+            row.error = error
+            if error is None:
+                row.status, row.sent_at = "sent", time.time()
+                return 1
+            if dead or row.attempts >= self.NOTIFY_MAX_ATTEMPTS:
+                row.status = "dead"
+            else:
+                row.next_try_at = time.time() + min(3600, 30 * 2**row.attempts)
+        return 0
 
     def _notify_loop(self) -> None:
         while not self._stop.wait(5):
