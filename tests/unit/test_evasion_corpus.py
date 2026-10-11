@@ -25,7 +25,8 @@ def test_outcome_is_the_documented_one(case):
 
 
 def test_the_published_report_is_current():
-    assert report.OUT.exists() and report.OUT.read_text() == report.render(), (
+    assert report.OUT.exists(), "docs/evasion-report.md is missing: run scripts/evasion_report.py"
+    assert report.OUT.read_text() == report.render(), (
         "docs/evasion-report.md is out of date: run scripts/evasion_report.py"
     )
 
