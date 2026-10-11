@@ -28,7 +28,7 @@ LABEL org.opencontainers.image.title="NeuraWall" \
       org.opencontainers.image.description="AI-assisted firewall: deterministic enforcement, three-tier inference, human-approved policy" \
       org.opencontainers.image.licenses="LicenseRef-Proprietary"
 RUN apt-get update \
- && apt-get install -y --no-install-recommends nftables ca-certificates tini \
+ && apt-get install -y --no-install-recommends ca-certificates nftables tini \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 10001 neurawall \
  && useradd --system --uid 10001 --gid neurawall --home-dir /data --shell /usr/sbin/nologin neurawall \

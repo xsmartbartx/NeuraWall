@@ -192,13 +192,9 @@ def test_login_rate_limit(client):
         client.post("/api/v1/auth/login", json={"email": "x@y.z", "password": "p"}).status_code
         for _ in range(40)
     ]
-    assert (
-        codes.count(403) >= 30
-        and "too many"
-        in client.post("/api/v1/auth/login", json={"email": "x@y.z", "password": "p"}).json()[
-            "message"
-        ]
-    )
+    assert codes.count(403) >= 30
+    message = client.post("/api/v1/auth/login", json={"email": "x@y.z", "password": "p"}).json()
+    assert "too many" in message["message"]
 
 
 def test_password_change_revokes_old_sessions_and_returns_new_one(client, tmp_path):

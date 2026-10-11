@@ -7,7 +7,7 @@ controlPlane:
   # The control plane keeps Tier 1 baselines and the Tier 3 queue in memory:
   # run exactly one replica (scale vertically).
   resources:
-    requests: { cpu: 250m, memory: 512Mi }
+    requests: { cpu: 250m, memory: 512Mi, ephemeral-storage: 256Mi }
     limits: { memory: 2Gi, ephemeral-storage: 1Gi }
   publicUrl: https://neurawall.example.com
   requireFourEyes: false

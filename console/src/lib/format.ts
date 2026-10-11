@@ -52,6 +52,6 @@ export function matchSummary(m: Record<string, unknown>): string[] {
     const floor = conf ? ` ≥ ${conf}` : "";
     out.push(`label ${(m.labels as string[]).join(" | ")}${floor}`);
   }
-  if (m.min_anomaly_score !== null && m.min_anomaly_score !== undefined) out.push(`anomaly ≥ ${String(m.min_anomaly_score)}`);
+  if (m.min_anomaly_score !== null && m.min_anomaly_score !== undefined) out.push(`anomaly ≥ ${m.min_anomaly_score as number}`);
   return out;
 }
