@@ -14,6 +14,7 @@ export function Audit() {
   const [verify, setVerify] = useState<{ valid: boolean; entries?: number; error?: string } | null>(null);
   const qs = new URLSearchParams({ limit: String(LIMIT), offset: String(offset) });
   if (prefix) qs.set("action", prefix);
+  const exportPath = "/audit/export.csv" + (prefix ? "?action=" + encodeURIComponent(prefix) : "");
   const { data, error } = useApi<Page<AuditRow>>(`/audit?${qs}`);
 
   return (
@@ -21,7 +22,7 @@ export function Audit() {
       <PageHead
         title="Audit trail"
         desc="Append-only, hash-chained record of every enforcement change, approval, bundle and sign-in. Any edit or deletion of a past entry breaks verification."
-        actions={<><ExportButton path={`/audit/export.csv${prefix ? `?action=${encodeURIComponent(prefix)}` : ""}`} filename="audit.csv" /><button disabled={busy} onClick={async () => { const r = await run(() => api<{ valid: boolean; entries?: number; error?: string }>("/audit/verify")); if (r) setVerify(r); }}>Verify chain integrity</button></>}
+        actions={<><ExportButton path={exportPath} filename="audit.csv" /><button disabled={busy} onClick={async () => { const r = await run(() => api<{ valid: boolean; entries?: number; error?: string }>("/audit/verify")); if (r) setVerify(r); }}>Verify chain integrity</button></>}
       />
       {verify && (
         <div className={`callout ${verify.valid ? "" : "danger"}`} style={verify.valid ? { borderLeftColor: "var(--allow)" } : undefined}>
@@ -45,7 +46,7 @@ export function Audit() {
                   <td>{a.actor}</td>
                   <td className="mono">{a.action}</td>
                   <td className="mono">{a.target}</td>
-                  <td className="mono faint truncate" style={{ maxWidth: 360 }} title={JSON.stringify(a.detail)}>{Object.entries(a.detail).filter(([, v]) => v !== null && v !== "").map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join(" ")}</td>
+                  <td className="mono faint truncate" style={{ maxWidth: 360 }} title={JSON.stringify(a.detail)}>{Object.entries(a.detail).filter(([, v]) => v !== null && v !== "").map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(" ")}</td>
                   <td className="mono faint">{a.hash.slice(0, 10)}…</td>
                 </tr>
               ))}

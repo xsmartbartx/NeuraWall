@@ -145,7 +145,7 @@ export function Billing() {
               {current ? <span className="faint">Your plan</span>
                 : canBuy ? <button className="primary" disabled={busy} onClick={() => checkout(p.id)}>Upgrade to {p.name}</button>
                 : b.linked && b.manage_url && p.price_cents_month > 0 && p.self_serve ? <a className="btn" href={b.manage_url} target="_blank" rel="noopener noreferrer">Change in NEXORA</a>
-                : p.price_cents_month > 0 ? <a className="btn" href={`${SALES}${encodeURIComponent(`NeuraWall ${p.name}`)}`}>Contact sales</a>
+                : p.price_cents_month > 0 ? <a className="btn" href={SALES + encodeURIComponent("NeuraWall " + p.name)}>Contact sales</a>
                 : null}
             </div>
           );

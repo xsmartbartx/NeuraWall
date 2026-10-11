@@ -30,13 +30,13 @@ export function bytes(n: number): string {
 }
 
 export const pct = (x: number, digits = 1) => `${(x * 100).toFixed(digits)}%`;
-export const human = (s: string) => s.replace(/_/g, " ");
+export const human = (s: string) => s.replaceAll("_", " ");
 
 export function matchSummary(m: Record<string, unknown>): string[] {
   const out: string[] = [];
   const list = (k: string, label: string) => {
     const v = m[k] as unknown[] | undefined;
-    if (v && v.length) out.push(`${label} ${v.join(", ")}`);
+    if (v?.length) out.push(`${label} ${v.join(", ")}`);
   };
   list("src_cidrs", "src");
   list("dst_cidrs", "dst");
@@ -49,8 +49,9 @@ export function matchSummary(m: Record<string, unknown>): string[] {
   list("ja3", "ja3");
   if ((m.labels as string[] | undefined)?.length) {
     const conf = m.min_label_confidence as number | undefined;
-    out.push(`label ${(m.labels as string[]).join(" | ")}${conf ? ` ≥ ${conf}` : ""}`);
+    const floor = conf ? ` ≥ ${conf}` : "";
+    out.push(`label ${(m.labels as string[]).join(" | ")}${floor}`);
   }
-  if (m.min_anomaly_score !== null && m.min_anomaly_score !== undefined) out.push(`anomaly ≥ ${m.min_anomaly_score}`);
+  if (m.min_anomaly_score !== null && m.min_anomaly_score !== undefined) out.push(`anomaly ≥ ${String(m.min_anomaly_score)}`);
   return out;
 }
