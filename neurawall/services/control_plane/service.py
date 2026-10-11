@@ -989,28 +989,7 @@ class ControlPlane:
                 if f.flow_id in existing:
                     continue
                 existing.add(f.flow_id)
-                row = db.FlowRow(
-                    flow_id=f.flow_id,
-                    node_id=node_id,
-                    ts=f.ts_start,
-                    src_ip=f.src_ip,
-                    dst_ip=f.dst_ip,
-                    dst_port=f.dst_port,
-                    protocol=f.protocol.value,
-                    bytes_total=f.bytes_out + f.bytes_in,
-                    action=v.action.value,
-                    enforced=v.enforced,
-                    rule_id=v.rule_id,
-                    anomaly_score=v.anomaly_score,
-                    labels=",".join(sorted({x.value for x in v.labels}))[:200],
-                    host=f.sni or f.dns_qname or (f.l7.http.host if f.l7 and f.l7.http else None),
-                    flow=f.model_dump(mode="json"),
-                    signals={
-                        "anomaly": ev.anomaly.model_dump(mode="json") if ev.anomaly else None,
-                        "classifications": [c.model_dump(mode="json") for c in ev.classifications],
-                    },
-                    verdict=v.model_dump(mode="json"),
-                )
+                row = self._flow_row(node_id, ev, v)
                 if v.action != Action.ALLOW:
                     alert_id, wants_tier3 = self._attach_alert(s, node_id, ev, v)
                     row.alert_id = alert_id
@@ -1018,10 +997,39 @@ class ControlPlane:
                         tier3.append(alert_id)
                 s.add(row)
         for alert_id in tier3:
-            try:
-                self._tier3.put_nowait(alert_id)
-            except queue.Full:
-                log.warning("tier3 queue full; alert triage deferred", alert_id=alert_id)
+            self._queue_tier3(alert_id)
+
+    def _queue_tier3(self, alert_id: int) -> None:
+        try:
+            self._tier3.put_nowait(alert_id)
+        except queue.Full:
+            log.warning("tier3 queue full; alert triage deferred", alert_id=alert_id)
+
+    @staticmethod
+    def _flow_row(node_id: str, ev: Evidence, v: Verdict) -> db.FlowRow:
+        f = ev.flow
+        return db.FlowRow(
+            flow_id=f.flow_id,
+            node_id=node_id,
+            ts=f.ts_start,
+            src_ip=f.src_ip,
+            dst_ip=f.dst_ip,
+            dst_port=f.dst_port,
+            protocol=f.protocol.value,
+            bytes_total=f.bytes_out + f.bytes_in,
+            action=v.action.value,
+            enforced=v.enforced,
+            rule_id=v.rule_id,
+            anomaly_score=v.anomaly_score,
+            labels=",".join(sorted({x.value for x in v.labels}))[:200],
+            host=f.sni or f.dns_qname or (f.l7.http.host if f.l7 and f.l7.http else None),
+            flow=f.model_dump(mode="json"),
+            signals={
+                "anomaly": ev.anomaly.model_dump(mode="json") if ev.anomaly else None,
+                "classifications": [c.model_dump(mode="json") for c in ev.classifications],
+            },
+            verdict=v.model_dump(mode="json"),
+        )
 
     def _attach_alert(self, s: Session, node_id: str, ev: Evidence, v: Verdict) -> tuple[int, bool]:
         f = ev.flow
