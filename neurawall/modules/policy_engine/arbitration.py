@@ -18,6 +18,20 @@ _verdicts = REGISTRY.counter("neurawall_verdicts_total", "Verdicts by action and
 _eval_latency = REGISTRY.histogram("neurawall_arbitration_seconds", "Policy evaluation latency")
 
 
+#: Tier 2 labels for payloads in a request: a single strong rule scores 0.5 to 0.62, so the general
+#: 0.7 alert threshold misses them (docs/evasion-report.md). Benign traffic did not reach 0.5 for them.
+INJECTION_LABELS = frozenset(
+    {
+        ThreatLabel.SQL_INJECTION,
+        ThreatLabel.COMMAND_INJECTION,
+        ThreatLabel.TEMPLATE_INJECTION,
+        ThreatLabel.PATH_TRAVERSAL,
+        ThreatLabel.XSS,
+    }
+)
+INJECTION_ALERT_THRESHOLD = 0.5
+
+
 class PolicyEngine:
     def __init__(self, bundle: PolicyBundle) -> None:
         self.bundle = bundle
@@ -92,9 +106,14 @@ class PolicyEngine:
         if ev.anomaly and ev.anomaly.score >= self.bundle.anomaly_alert_threshold:
             return True
         return any(
-            c.label != ThreatLabel.BENIGN and c.confidence >= self.bundle.classifier_alert_threshold
+            c.label != ThreatLabel.BENIGN and c.confidence >= self._alert_threshold(c.label)
             for c in ev.classifications
         )
+
+    def _alert_threshold(self, label: ThreatLabel) -> float:
+        """Web-injection labels alert earlier than the rest (see `INJECTION_ALERT_THRESHOLD`)."""
+        base = self.bundle.classifier_alert_threshold
+        return min(base, INJECTION_ALERT_THRESHOLD) if label in INJECTION_LABELS else base
 
     @staticmethod
     def _signal_reasons(ev: Evidence) -> list[str]:

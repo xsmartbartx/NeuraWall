@@ -15,13 +15,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from neurawall.core.config import PolicySettings  # noqa: E402
 from neurawall.core.models import FlowRecord, HttpMeta, L7Meta  # noqa: E402
 from neurawall.modules.l7_classifier import L7Classifier  # noqa: E402
 from neurawall.modules.l7_classifier.classifier import MODEL_VERSION  # noqa: E402
+from neurawall.modules.policy_engine.arbitration import INJECTION_ALERT_THRESHOLD  # noqa: E402
 from tests.evasion_corpus import CASES, Case  # noqa: E402
 
 OUT = ROOT / "docs" / "evasion-report.md"
-FLOOR, ALERT = 0.3, 0.7
+FLOOR = 0.3  # below this the detectors report no finding
+ALERT = min(
+    PolicySettings().classifier_alert_threshold, INJECTION_ALERT_THRESHOLD
+)  # injection labels
 
 
 def measure(case: Case) -> tuple[str, float]:
@@ -63,8 +68,8 @@ def render() -> str:
         "**What it is not.** A detection rate on real traffic, a benchmark against other products, or a statement about the DNS,",
         "beaconing, exfiltration and TLS detectors, which are stateful and are not covered here.",
         "",
-        "Two thresholds: *caught* is a finding of at least 0.3 with the right label, the detector's floor. *Alert-grade* is at least 0.7,",
-        "where the control plane raises an alert by itself without a matching rule. Remember that no detector can block: a rule",
+        f"Two thresholds: *caught* is a finding of at least {FLOOR} with the right label, the detector's floor. *Alert-grade* is at least {ALERT},",
+        "where the control plane raises an alert by itself without a matching rule (0.5 for these web-injection labels, `policy.classifier_alert_threshold` = 0.7 for the rest). No detector can block: a rule",
         "a human approved is what enforces.",
         "",
         f"**{len(rows)} cases: {totals['alert']} alert-grade, {totals['caught']} caught below alert grade, {totals['missed']} missed"
@@ -76,12 +81,11 @@ def render() -> str:
     lines += [
         "## Headline findings",
         "",
-        f"- **Most single-rule hits are labelled but do not raise an alert.** {len(below)} of {len(rows)} cases landed between 0.3 and 0.7,",
-        "  including the textbook `<script>alert(1)</script>` and a bare `|id`. The label is stored on the flow, but Tier 2 alone raises",
-        "  an alert only at the bundle's classifier threshold (0.7 by default); a high Tier 1 anomaly score can still raise one.",
-        "- **The starter rule that blocks web injection needs 0.9.** Only the payloads that trip two or more rules reach it, so the",
-        "  baseline `UNION SELECT` (0.88) is alert-grade but is not blocked by the starter pack. Lowering the threshold trades missed",
-        "  attacks for blocked legitimate requests; that choice belongs to the operator, which is why it is a rule a person approves.",
+        f"- **{len(below)} of {len(rows)} cases are labelled but do not raise an alert** (between {FLOOR} and {ALERT}).",
+        f"  The label is stored on the flow, but Tier 2 alone raises an alert only at {ALERT} or more; a high Tier 1 anomaly score can still raise one.",
+        "- **The starter rule that blocks web injection needs 0.9.** Only payloads that trip two or more rules reach it, so blocking stays",
+        "  conservative on purpose: a miss costs an alert you did not get, a wrong block costs a legitimate request. The alert threshold",
+        "  is a setting; the block threshold is a rule a person approves.",
         f"- **{totals['missed']} cases are missed outright.** Mostly encodings and spellings the normaliser does not undo (versioned SQL",
         "  comments, full-width letters, HTML entities, wildcards and quote-splitting in shell words) and thresholds a lone weak rule does not reach.",
         "- **The detector is a first line, not a verdict.** NeuraWall's design assumes this: a model or heuristic can only raise an alert,",
