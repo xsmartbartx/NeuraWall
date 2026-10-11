@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Badge, Card, Drawer, ErrorBox, Loading, Modal, PageHead, activatable } from "../components/ui";
-import { api, type HygieneFinding, type Rule } from "../lib/api";
-import { dateTime, human, matchSummary } from "../lib/format";
+import { api, type HygieneFinding, type Rule, type RuleStats, type Simulation } from "../lib/api";
+import { ago, dateTime, human, matchSummary } from "../lib/format";
+import { SimulationView } from "./Approvals";
 import { useAction, useApi, useAuth } from "../lib/hooks";
 
 export function Rules() {
@@ -9,7 +10,10 @@ export function Rules() {
   const { run, busy } = useAction();
   const { data, error, reload } = useApi<Rule[]>("/rules");
   const { data: hygiene, reload: reloadHygiene } = useApi<HygieneFinding[]>("/rules/hygiene");
+  const { data: stats } = useApi<RuleStats>("/rules/stats", { poll: 30000 });
+  const days = stats ? Math.round(stats.hours / 24) : 7;
   const [selected, setSelected] = useState<Rule | null>(null);
+  const [cleanup, setCleanup] = useState<HygieneFinding | null>(null);
   const [deleting, setDeleting] = useState<Rule | null>(null);
   const canEdit = can("rules:approve");
   const findingsFor = (id: string) => hygiene?.filter((h) => h.rule_id === id) ?? [];
@@ -25,13 +29,13 @@ export function Rules() {
       {hygiene && hygiene.length > 0 && (
         <div className="callout warn">
           <b>Rule-set hygiene:</b> {hygiene.length} finding{hygiene.length > 1 ? "s" : ""}.
-          <ul className="list-plain" style={{ marginTop: 6 }}>{hygiene.map((h, i) => <li key={i}><span className="mono">{h.rule_id}</span> — <b>{human(h.kind)}</b>: {h.detail}</li>)}</ul>
+          <ul className="list-plain" style={{ marginTop: 6 }}>{hygiene.map((h, i) => <li key={i}><span className="mono">{h.rule_id}</span> — <b>{human(h.kind)}</b>: {h.detail}{canEdit && (h.kind === "redundant" || h.kind === "shadowed") && (data ?? []).find((r) => r.id === h.rule_id)?.enabled && <> <button className="small" disabled={busy} onClick={() => setCleanup(h)}>Clean up…</button></>}</li>)}</ul>
         </div>
       )}
       <Card pad={false}>
         {error ? <div className="card-body"><ErrorBox error={error} /></div> : !data ? <Loading /> : (
           <div className="table-wrap"><table>
-            <thead><tr><th>ID</th><th className="num">Priority</th><th>Name</th><th>Action</th><th>Mode</th><th>Match</th><th>Enabled</th></tr></thead>
+            <thead><tr><th>ID</th><th className="num">Priority</th><th>Name</th><th>Action</th><th>Mode</th><th>Match</th><th className="num">Matches ({days}d)</th><th>Last match</th><th>Enabled</th></tr></thead>
             <tbody>
               {data.map((r) => (
                 <tr key={r.id} className={`clickable ${selected?.id === r.id ? "selected" : ""}`} onClick={() => setSelected(r)} {...activatable(() => setSelected(r))} style={{ opacity: r.enabled ? 1 : 0.55 }}>
@@ -41,6 +45,8 @@ export function Rules() {
                   <td><Badge kind={r.action} /></td>
                   <td><Badge kind={r.mode} /></td>
                   <td className="mono truncate faint" style={{ maxWidth: 300 }}>{matchSummary(r.match as Record<string, unknown>).join(" · ")}</td>
+                  <td className="num">{stats ? (stats.rules[r.id]?.matches ?? 0).toLocaleString() : "…"}</td>
+                  <td className="muted">{stats ? (stats.rules[r.id] ? ago(stats.rules[r.id]!.last_match) : <span className="faint" title={`No flow matched this rule in the last ${days} days`}>never</span>) : "…"}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={r.enabled} disabled={!canEdit || busy} aria-label={`Enable ${r.id}`}
                       onChange={() => patch(r, { enabled: !r.enabled }, `${r.id} ${r.enabled ? "disabled" : "enabled"}`)} />
@@ -51,10 +57,27 @@ export function Rules() {
           </table></div>
         )}
       </Card>
+      {cleanup && (() => {
+        const rule = (data ?? []).find((r) => r.id === cleanup.rule_id);
+        const n = stats?.rules[cleanup.rule_id]?.matches ?? 0;
+        return (
+          <Modal title={`Disable ${cleanup.rule_id}?`} onClose={() => setCleanup(null)} footer={<>
+            <button onClick={() => setCleanup(null)}>Cancel</button>
+            <button className="primary" disabled={busy || !rule} onClick={async () => { if (rule) await patch(rule, { enabled: false }, `${rule.id} disabled`); setCleanup(null); reloadHygiene(); }}>Disable rule</button>
+          </>}>
+            <p style={{ margin: 0 }}>{cleanup.detail}</p>
+            <p style={{ margin: 0 }}>Because the earlier rule takes all of this rule's traffic first, disabling it changes no verdict. It stays in the list, and you can turn it back on. Disabling publishes a new signed bundle and is recorded in the audit trail.</p>
+            {n > 0
+              ? <div className="callout warn" role="status">It did match {n.toLocaleString()} flow{n === 1 ? "" : "s"} in the last {days} days. That can happen if the covering rule was added or enabled recently. Check before you disable it.</div>
+              : <div className="callout" role="status">No flow matched it in the last {days} days, which agrees with the finding.</div>}
+          </Modal>
+        );
+      })()}
       {selected && (
         <Drawer onClose={() => setSelected(null)} title={`${selected.id} · ${selected.name}`}
           sub={<span className="row"><Badge kind={selected.action} /><Badge kind={selected.mode} />{!selected.enabled && <Badge kind="offline">disabled</Badge>}<span>v{selected.version}</span></span>}>
           <div className="callout"><h3 style={{ marginBottom: 6 }}>Rationale</h3>{selected.rationale}</div>
+          <RuleImpact ruleId={selected.id} matches={stats?.rules[selected.id]?.matches ?? 0} days={days} />
           {selected.description && <p className="muted" style={{ margin: 0 }}>{selected.description}</p>}
           <dl className="kv">
             <dt>Priority</dt><dd className="mono">{selected.priority}</dd>
@@ -89,5 +112,23 @@ export function Rules() {
         </Modal>
       )}
     </>
+  );
+}
+
+/** The rule replayed against recent traffic, on demand (it replays up to 20,000 flows). */
+function RuleImpact({ ruleId, matches, days }: { ruleId: string; matches: number; days: number }) {
+  const { run, busy } = useAction();
+  const [sim, setSim] = useState<Simulation | null>(null);
+  return (
+    <Card title="Impact on recent traffic">
+      <p className="muted" style={{ marginTop: 0 }}>
+        {matches === 0 ? `No flow matched this rule in the last ${days} days.` : `${matches.toLocaleString()} flows matched this rule in the last ${days} days.`}
+      </p>
+      {sim ? <SimulationView sim={sim} /> : (
+        <button disabled={busy} onClick={async () => { const r = await run(() => api<Simulation>(`/rules/${ruleId}/impact`)); if (r) setSim(r); }}>
+          {busy ? "Replaying…" : "Replay against recent traffic"}
+        </button>
+      )}
+    </Card>
   );
 }

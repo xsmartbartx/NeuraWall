@@ -35,7 +35,7 @@ Console text and form fields meet WCAG AA contrast (both themes),accessibility,s
 Claude usage per month visible to admins,billing,should,yes,yes,Billing page meter and GET /llm/usage
 Published detector evasion report (what Tier 2 catches and misses),detection,should,no,yes,"docs/evasion-report.md, generated and pinned by tests; HTTP injection detector only"
 """What we detect without decrypting"" page in docs and on the product page",docs,should,no,partial,docs/encrypted-traffic.md written; the product page copy is on the NEXORA site
-One-click cleanup draft from a rule hygiene finding,approvals,could,no,no,"fix #3, thin evidence"
-Blast radius and last-match count on the Rules page,approvals,could,no,no,"fix #4, thin evidence"
+One-click cleanup of a redundant or shadowed rule,approvals,could,no,partial,disables the rule after a confirmation (no verdict changes); overly-broad findings stay advice; not a draft/approve flow
+Blast radius and last-match count on the Rules page,approvals,could,no,yes,Rules page columns and an on-demand replay card; GET /rules/stats and /rules/{id}/impact
 "Console is operable by keyboard (rows, dialogs, charts, meters)",accessibility,should,yes,yes,verified in the running console; no axe scan or screen-reader pass yet
 Erase a person without breaking the audit chain,access,should,yes,yes,audit holds user:<id>; older entries and rule JSON may still hold emails (docs/security.md)

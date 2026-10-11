@@ -25,7 +25,7 @@ curl -s https://nw.example.com/api/v1/alerts?status=open -H "Authorization: Bear
 | Dashboard | `GET /dashboard?hours=` | read |
 | Flows | `GET /flows` (filters: `q`, `action`, `label`, `node`, `alert_id`, `min_score`, `hours`), `GET /flows/{id}`, `POST /flows/{id}/explain` | read / advisor |
 | Alerts | `GET /alerts`, `GET/PATCH /alerts/{id}`, `POST /alerts/{id}/triage`, `POST /alerts/{id}/narrate` | read / triage / advisor |
-| Rules | `GET /rules`, `GET /rules/hygiene`, `GET/PATCH/DELETE /rules/{id}` | read / approve |
+| Rules | `GET /rules`, `GET /rules/stats?hours=` (matches and last match per rule), `GET /rules/{id}/impact` (blast radius on recent traffic), `GET /rules/hygiene`, `GET/PATCH/DELETE /rules/{id}` | read / approve |
 | Drafts | `GET /drafts`, `POST /drafts`, `POST /drafts/simulate`, `POST /drafts/{id}/approve`, `POST /drafts/{id}/reject` | read / author / approve |
 | Bundles | `GET /bundles`, `POST /bundles/publish`, `POST /bundles/{v}/advance`, `POST /bundles/{v}/rollback` | read / approve |
 | Fleet | `GET /nodes`, `POST /nodes/enrollment-tokens`, `POST /nodes/{id}/revoke` | read / fleet |
