@@ -194,7 +194,7 @@ function NewDraftModal({ onClose, onCreated }: Readonly<{ onClose: () => void; o
     </>}>
       <label className="field">Name<input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} /></label>
       <label className="field">Rationale (shown to approvers)<textarea rows={3} value={rationale} onChange={(e) => setRationale(e.target.value)} /></label>
-      <label className="field">Action
+      <label className="field"><span>Action</span>
         <select value={action} onChange={(e) => setAction(e.target.value)}>
           {["alert", "rate_limit", "drop", "quarantine", "allow"].map((a) => <option key={a} value={a}>{human(a)}</option>)}
         </select>

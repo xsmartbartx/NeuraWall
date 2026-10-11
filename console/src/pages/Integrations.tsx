@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { deliveryBadge, deliveryLabel } from "../lib/labels";
-import { Badge, Card, Empty, ErrorBox, Loading, Modal, PageHead } from "../components/ui";
+import { Async, Badge, Card, Empty, Modal, PageHead } from "../components/ui";
 import { NexoraCard } from "../components/NexoraCard";
 import { SecretReveal, Toggle } from "../components/controls";
 import { api, type Channel, type Delivery, type Severity } from "../lib/api";
@@ -50,7 +50,7 @@ export function Integrations() {
         actions={<button className="primary" onClick={() => { setFormError(null); setEditing({ id: null, form: BLANK }); }}>Add webhook</button>} />
       <NexoraCard />
       <Card pad={false} title="Webhooks">
-        {error ? <ErrorBox error={error} /> : !channels ? <Loading /> : channels.length === 0 ? (
+        <Async error={error} data={channels}>{(channels) => channels.length === 0 ? (
           <Empty>No webhooks yet. Add one to send new alerts and pending approvals as signed JSON to Slack, Teams or any receiver that accepts a webhook.</Empty>
         ) : (
           <div className="table-wrap"><table>
@@ -78,10 +78,10 @@ export function Integrations() {
               ))}
             </tbody>
           </table></div>
-        )}
+        )}</Async>
       </Card>
       <Card pad={false} title="Recent deliveries">
-        {!deliveries ? <Loading /> : deliveries.length === 0 ? <Empty>Nothing has been sent yet.</Empty> : (
+        <Async error={null} data={deliveries}>{(deliveries) => deliveries.length === 0 ? <Empty>Nothing has been sent yet.</Empty> : (
           <div className="table-wrap"><table>
             <thead><tr><th>When</th><th>Webhook</th><th>Event</th><th>Result</th><th className="num">Tries</th></tr></thead>
             <tbody>
@@ -96,7 +96,7 @@ export function Integrations() {
               ))}
             </tbody>
           </table></div>
-        )}
+        )}</Async>
       </Card>
 
       {editing && (
@@ -115,7 +115,7 @@ export function Integrations() {
               <label key={ev} className="check"><input type="checkbox" checked={editing.form.events.includes(ev)} onChange={() => setEditing({ ...editing, form: toggleEvent(editing.form, ev) })} />{text}</label>
             ))}
           </fieldset>
-          <label className="field">Alerts of at least this severity
+          <label className="field"><span>Alerts of at least this severity</span>
             <select value={editing.form.min_severity} onChange={(e) => setEditing({ ...editing, form: { ...editing.form, min_severity: e.target.value as Severity } })}>
               {SEVERITIES.map((s) => <option key={s} value={s}>{human(s)}</option>)}
             </select>

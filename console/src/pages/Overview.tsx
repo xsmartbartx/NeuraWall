@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import { advisorLabel, scoreBand } from "../lib/labels";
+import { advisorLabel, plural, scoreBand } from "../lib/labels";
 import { Link, useNavigate } from "react-router-dom";
 import { BarList, VerdictTimeline } from "../components/charts";
 import { Badge, Card, ErrorBox, Kpi, Loading, PageHead, Meter, activatable } from "../components/ui";
@@ -80,7 +80,7 @@ export function Overview() {
             <p className="muted customer-hero-copy">
               {alertCount === 0 && d.nodes.total === d.nodes.online
                 ? "No open alerts and the connected fleet is fully online."
-                : `${alertCount} open alert${alertCount === 1 ? "" : "s"} and ${d.nodes.total - d.nodes.online} fleet issue${d.nodes.total - d.nodes.online === 1 ? "" : "s"} currently affect posture.`}
+                : `${plural(alertCount, "open alert")} and ${plural(d.nodes.total - d.nodes.online, "fleet issue")} currently affect posture.`}
             </p>
           </div>
         </div>

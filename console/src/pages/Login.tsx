@@ -35,10 +35,10 @@ export function Login() {
     <div className="login-wrap">
       <form className="card login" onSubmit={submit}>
         <div className="brand"><Logo size={32} /><div>NeuraWall<small>Operator console</small></div></div>
-        <label className="field">Email
+        <label className="field"><span>Email</span>
           <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
         </label>
-        <label className="field">Password
+        <label className="field"><span>Password</span>
           <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </label>
         {error && <div className="error-text" role="alert">{error}</div>}

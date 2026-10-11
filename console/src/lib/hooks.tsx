@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, hasToken, setToken, setUnauthorizedHandler, type Me } from "./api";
 
 // ---------------------------------------------------------------- data fetching
@@ -89,7 +89,11 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
 
   const can = useCallback((perm: string) => Boolean(me?.permissions.includes(perm)), [me]);
 
-  return <Auth.Provider value={{ me, ready, can, login, loginWithSso, loginDemo, logout, refresh }}>{children}</Auth.Provider>;
+  const value = useMemo(
+    () => ({ me, ready, can, login, loginWithSso, loginDemo, logout, refresh }),
+    [me, ready, can, login, loginWithSso, loginDemo, logout, refresh],
+  );
+  return <Auth.Provider value={value}>{children}</Auth.Provider>;
 }
 
 export function useAuth(): AuthCtx {
