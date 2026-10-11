@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { billingSource, llmAccess } from "../lib/labels";
 import { useSearchParams } from "react-router-dom";
 import { Badge, Card, ErrorBox, Loading, Meter, PageHead } from "../components/ui";
 import { api } from "../lib/api";
@@ -63,7 +64,7 @@ export function Billing() {
       <PageHead title="Billing" desc={`Your NeuraWall plan, what it includes and how much of it you use. ${b.linked ? "This installation belongs to a NEXORA organisation, so the plan is managed there." : "Payments are handled by Stripe."}`} />
       <div className="grid halves">
         <Card title={<div className="row"><h2>Current plan</h2><Badge kind="active">{plan.name}</Badge>
-          <span className="faint">{b.source === "stripe" ? "via Stripe" : b.source === "nexora" ? "via NEXORA" : "licence"}</span></div>}>
+          <span className="faint">{billingSource(b.source)}</span></div>}>
           <dl className="kv">
             <dt>Enforcement nodes</dt>
             <dd>
@@ -128,10 +129,17 @@ export function Billing() {
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))" }}>
         {b.plans.map((p) => {
           const current = p.id === plan.id;
-          const price = p.id === "enterprise_dedicated" ? "$5,000–15,000"
-            : interval === "year" && p.price_cents_year ? usd(p.price_cents_year) : usd(p.price_cents_month);
+          const yearly = interval === "year" && p.price_cents_year;
+          let price = usd(p.price_cents_month);
+          if (p.id === "enterprise_dedicated") price = "$5,000–15,000";
+          else if (yearly) price = usd(p.price_cents_year);
           const per = p.id === "enterprise_dedicated" || interval === "month" || !p.price_cents_year ? "/ month" : "/ year";
           const canBuy = admin && !b.linked && p.purchasable?.[interval] && !current;
+          let action: ReactNode = null;
+          if (current) action = <span className="faint">Your plan</span>;
+          else if (canBuy) action = <button className="primary" disabled={busy} onClick={() => checkout(p.id)}>Upgrade to {p.name}</button>;
+          else if (b.linked && b.manage_url && p.price_cents_month > 0 && p.self_serve) action = <a className="btn" href={b.manage_url} target="_blank" rel="noopener noreferrer">Change in NEXORA</a>;
+          else if (p.price_cents_month > 0) action = <a className="btn" href={`${SALES}${encodeURIComponent(`NeuraWall ${p.name}`)}`}>Contact sales</a>;
           return (
             <div key={p.id} className="card kpi" style={{ gap: 10, borderColor: current ? "var(--accent)" : undefined }}>
               <div className="row"><b>{p.name}</b>{current && <Badge kind="active">current</Badge>}</div>
@@ -139,14 +147,10 @@ export function Billing() {
               <ul className="list-plain" style={{ fontSize: 12.5 }}>
                 <li>{p.nodes_limit === null ? "Custom" : p.nodes_limit} enforcement node{p.nodes_limit === 1 ? "" : "s"}</li>
                 <li>{p.retention_days === null ? "Custom" : `${p.retention_days}-day`} retention</li>
-                <li>{p.llm_access === "included" ? "Claude AI included, monthly budget" : p.llm_access === "own_key" ? "Claude AI with your own key" : "Offline AI advisor"}</li>
+                <li>{llmAccess(p.llm_access)}</li>
                 <li>{p.support} support</li>
               </ul>
-              {current ? <span className="faint">Your plan</span>
-                : canBuy ? <button className="primary" disabled={busy} onClick={() => checkout(p.id)}>Upgrade to {p.name}</button>
-                : b.linked && b.manage_url && p.price_cents_month > 0 && p.self_serve ? <a className="btn" href={b.manage_url} target="_blank" rel="noopener noreferrer">Change in NEXORA</a>
-                : p.price_cents_month > 0 ? <a className="btn" href={`${SALES}${encodeURIComponent(`NeuraWall ${p.name}`)}`}>Contact sales</a>
-                : null}
+              {action}
             </div>
           );
         })}

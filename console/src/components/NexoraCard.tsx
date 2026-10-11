@@ -1,4 +1,5 @@
 import { Badge, Card, ErrorBox, Loading } from "./ui";
+import { linkBadge, linkLabel } from "../lib/labels";
 import { api } from "../lib/api";
 import { ago } from "../lib/format";
 import { useAction, useApi } from "../lib/hooks";
@@ -17,7 +18,7 @@ export function NexoraCard() {
   if (!n.linked) return <Card title="NEXORA"><p className="muted" style={{ margin: 0 }}>This installation is not linked to a NEXORA organisation. Set <code>NEURAWALL_NEXORA__API_KEY</code> to link it: the plan then comes from NEXORA.</p></Card>;
   const state = n.error ? (n.last_ok ? "grace" : "error") : "linked";
   return (
-    <Card title={<div className="row"><h2>NEXORA</h2><Badge kind={state === "linked" ? "active" : state === "grace" ? "alert" : "revoked"} dot>{state === "linked" ? "linked" : state === "grace" ? "using last known plan" : "not synced"}</Badge></div>}>
+    <Card title={<div className="row"><h2>NEXORA</h2><Badge kind={linkBadge(state)} dot>{linkLabel(state)}</Badge></div>}>
       <dl className="kv">
         <dt>Organisation</dt><dd className="mono">{n.organisation ?? "—"}</dd>
         <dt>Plan</dt><dd className="mono">{n.plan}</dd>

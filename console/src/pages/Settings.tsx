@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { advisorBadge } from "../lib/labels";
 import { Badge, Card, ErrorBox, Loading, PageHead } from "../components/ui";
 import { api, setToken, type SystemInfo } from "../lib/api";
 import { useAction, useApi, useAuth } from "../lib/hooks";
@@ -36,7 +37,7 @@ export function Settings() {
           </Card>
           <Card title="Tier 3 advisor">
             <dl className="kv">
-              <dt>Mode</dt><dd><Badge kind={s.advisor.mode === "online" ? "llm" : s.advisor.mode === "degraded" || s.advisor.mode === "budget_reached" ? "alert" : "info"} dot>{s.advisor.mode === "budget_reached" ? "monthly budget reached" : s.advisor.mode}</Badge></dd>
+              <dt>Mode</dt><dd><Badge kind={advisorBadge(s.advisor.mode)} dot>{s.advisor.mode === "budget_reached" ? "monthly budget reached" : s.advisor.mode}</Badge></dd>
               <dt>Provider</dt><dd className="mono">{s.advisor.provider}</dd>
               <dt>Model</dt><dd className="mono">{s.advisor.model ?? "offline heuristic advisor"}</dd>
               <dt>Budget left this hour</dt><dd className="mono">{s.advisor.budget_remaining}</dd>

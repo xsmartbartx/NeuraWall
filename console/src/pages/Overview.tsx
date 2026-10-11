@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from "react";
+import { advisorLabel, scoreBand } from "../lib/labels";
 import { Link, useNavigate } from "react-router-dom";
 import { BarList, VerdictTimeline } from "../components/charts";
 import { Badge, Card, ErrorBox, Kpi, Loading, PageHead, Meter, activatable } from "../components/ui";
@@ -22,7 +23,7 @@ function healthScore(d: Dashboard): number {
 }
 
 function scoreTone(score: number) {
-  return score >= 90 ? "allow" : score >= 70 ? "alert" : "block";
+  return scoreBand(score, "allow", "alert", "block");
 }
 
 export function Overview() {
@@ -44,7 +45,7 @@ export function Overview() {
   const tone = scoreTone(score);
   const nodeCapacity = billing?.plan.nodes_limit ? billing.usage.nodes / billing.plan.nodes_limit : 0;
   const firstName = me?.name?.trim() ? me.name.trim().split(/\s+/)[0] : "there";
-  const healthText = score >= 90 ? "Healthy" : score >= 70 ? "Needs attention" : "Action required";
+  const healthText = scoreBand(score, "Healthy", "Needs attention", "Action required");
 
   return (
     <>
@@ -96,7 +97,7 @@ export function Overview() {
         <Kpi label="Threats blocked" value={num(d.enforced_blocks)} tone="block" sub={d.total_flows ? `${pct(d.enforced_blocks / d.total_flows, 2)} of analysed traffic` : "No analysed traffic"} />
         <Kpi label="Open alerts" value={alertCount} tone={alertCount ? "alert" : ""} sub={alertCount ? "Needs review" : "No active incident backlog"} />
         <Kpi label="Active policy" value={num(d.active_rules)} sub={`bundle v${d.bundle_version}`} />
-        <Kpi label="AI advisor" value={d.advisor_mode === "online" ? "Online" : d.advisor_mode === "degraded" ? "Degraded" : "Offline"} tone="ai"
+        <Kpi label="AI advisor" value={advisorLabel(d.advisor_mode)} tone="ai"
           sub={`Tier 3 · ${billing?.plan.llm_advisor_allowed ? "plan enabled" : "offline advisor"}`} />
       </div>
 
