@@ -21,7 +21,9 @@ def verdict(label, confidence, **bundle):
 def test_injection_labels_alert_from_half_and_never_block(label):
     below, at = verdict(label, 0.49), verdict(label, 0.5)
     assert below.action == Action.ALLOW
-    assert at.action == Action.ALERT and not at.enforced and at.rule_id is None
+    assert at.action == Action.ALERT
+    assert not at.enforced
+    assert at.rule_id is None
 
 
 @pytest.mark.parametrize("label", [ThreatLabel.DGA, ThreatLabel.DNS_TUNNEL, ThreatLabel.C2_BEACON])
