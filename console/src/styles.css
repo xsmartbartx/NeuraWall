@@ -156,6 +156,7 @@ td.num, th.num { text-align: right; font-family: var(--mono); }
 .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 pre.code { background: var(--bg-sunken); border: 1px solid var(--border); border-radius: 6px; padding: 12px; overflow: auto; font: 12px/1.55 var(--mono); margin: 0; max-height: 360px; }
 .callout { border: 1px solid var(--border); border-left: 3px solid var(--info); background: var(--bg-sunken); padding: 10px 14px; border-radius: 6px; }
+output.callout { display: block; }
 .callout.ai { border-left-color: var(--ai); }
 .callout.warn { border-left-color: var(--alert); }
 .callout.danger { border-left-color: var(--block); }

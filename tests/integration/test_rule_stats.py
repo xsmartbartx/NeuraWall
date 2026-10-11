@@ -1,28 +1,5 @@
-import pytest
-from fastapi.testclient import TestClient
-
-from neurawall.core.config import load_settings
 from neurawall.modules.flow_collector.generator import TrafficGenerator
-from neurawall.security.integrity import EphemeralSigner
 from neurawall.services.control_plane import db
-from neurawall.services.control_plane.app import create_app
-from neurawall.services.control_plane.service import ControlPlane
-
-ADMIN = ("admin@neurawall.local", "Admin-Password-1!")
-
-
-@pytest.fixture
-def env(tmp_path):
-    settings = load_settings(
-        environment="test",
-        data_dir=tmp_path,
-        log_json=False,
-        auth={"bootstrap_admin_password": ADMIN[1]},
-    )
-    cp = ControlPlane(settings, signer=EphemeralSigner(), advisor_backend=None)
-    with TestClient(create_app(settings, control_plane=cp, start_background=False)) as c:
-        r = c.post("/api/v1/auth/login", json={"email": ADMIN[0], "password": ADMIN[1]})
-        yield cp, c, {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 def ingest_attacks(cp):
@@ -45,7 +22,8 @@ def test_stats_count_matches_per_rule_and_leave_unmatched_rules_out(env):
             expected[rid] = expected.get(rid, 0) + 1
     assert {k: v["matches"] for k, v in rules.items()} == expected
     all_rules = {r["id"] for r in c.get("/api/v1/rules", headers=h).json()}
-    assert set(rules) <= all_rules and len(all_rules - set(rules)) > 0  # some never matched
+    assert set(rules) <= all_rules
+    assert all_rules - set(rules)  # some rules never matched
     assert all(v["last_match"] > 0 for v in rules.values())
 
 
@@ -67,7 +45,8 @@ def test_impact_replays_the_rule_against_recent_traffic(env):
     r = c.get(f"/api/v1/rules/{rule_id}/impact", headers=h)
     assert r.status_code == 200
     body = r.json()
-    assert body["flows_evaluated"] > 0 and 0.0 <= body["blast_radius"] <= 1.0
+    assert body["flows_evaluated"] > 0
+    assert 0.0 <= body["blast_radius"] <= 1.0
     assert body["threshold"] == cp.settings.policy.blast_radius_threshold
     assert c.get("/api/v1/rules/R-999999/impact", headers=h).status_code == 404
 
@@ -113,11 +92,13 @@ def test_disabling_a_redundant_rule_clears_the_finding_and_changes_no_verdict(en
     assert rule_id not in stats  # it can never match: the covering rule takes the traffic first
     verdicts_before = c.get("/api/v1/flows?limit=500", headers=h).json()["total"]
     r = c.patch(f"/api/v1/rules/{rule_id}", headers=h, json={"enabled": False})
-    assert r.status_code == 200 and r.json()["enabled"] is False
+    assert r.status_code == 200
+    assert r.json()["enabled"] is False
     assert [
         f for f in c.get("/api/v1/rules/hygiene", headers=h).json() if f["rule_id"] == rule_id
     ] == []
     ingest_attacks(cp)
     assert c.get("/api/v1/flows?limit=500", headers=h).json()["total"] >= verdicts_before
     actions = [a["action"] for a in c.get("/api/v1/audit?limit=20", headers=h).json()["items"]]
-    assert "rule.update" in actions and cp.verify_audit() > 0
+    assert "rule.update" in actions
+    assert cp.verify_audit() > 0
