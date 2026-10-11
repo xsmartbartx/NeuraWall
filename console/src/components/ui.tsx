@@ -82,7 +82,7 @@ export function Drawer({ onClose, title, sub, children }: Readonly<{ onClose: ()
   const ref = useDialog<HTMLElement>(onClose);
   return (
     <>
-      <div className="drawer-backdrop" role="presentation" onClick={onClose} />
+      <div className="drawer-backdrop" onMouseDown={onClose} />
       <aside className="drawer" role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined} ref={ref} tabIndex={-1}>
         <div className="drawer-head">
           <div style={{ flex: 1, minWidth: 0 }}><h2>{title}</h2>{sub && <div className="muted" style={{ marginTop: 4 }}>{sub}</div>}</div>

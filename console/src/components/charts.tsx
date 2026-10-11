@@ -75,18 +75,20 @@ export function BarList({ items, color = "var(--alert)", onClick }: Readonly<{
   if (!items.length) return <div className="muted">No data in this window.</div>;
   return (
     <div className="bar-list">
-      {items.map((i) => (
-        <div key={i.label} className="item" style={{ cursor: onClick ? "pointer" : undefined }} onClick={() => onClick?.(i.label)}
-          onKeyDown={(e) => {
-            if (!onClick || e.target !== e.currentTarget) return;
-            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(i.label); }
-          }}
-          role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined}>
-          <span className="mono truncate">{i.label}</span>
-          <span className="mono muted">{num(i.value)}</span>
-          <div className="track"><div className="fill" style={{ width: `${(i.value / max) * 100}%`, background: color }} /></div>
-        </div>
-      ))}
+      {items.map((i) => {
+        const body = (
+          <>
+            <span className="mono truncate">{i.label}</span>
+            <span className="mono muted">{num(i.value)}</span>
+            <span className="track"><span className="fill" style={{ width: `${(i.value / max) * 100}%`, background: color }} /></span>
+          </>
+        );
+        return onClick ? (
+          <button key={i.label} type="button" className="item item-btn" onClick={() => onClick(i.label)}>{body}</button>
+        ) : (
+          <div key={i.label} className="item">{body}</div>
+        );
+      })}
     </div>
   );
 }
