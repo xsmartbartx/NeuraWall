@@ -46,7 +46,7 @@ export function Audit() {
                   <td>{a.actor}</td>
                   <td className="mono">{a.action}</td>
                   <td className="mono">{a.target}</td>
-                  <td className="mono faint truncate" style={{ maxWidth: 360 }} title={JSON.stringify(a.detail)}>{Object.entries(a.detail).filter(([, v]) => v !== null && v !== "").map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(" ")}</td>
+                  <td className="mono faint truncate" style={{ maxWidth: 360 }} title={JSON.stringify(a.detail)}>{Object.entries(a.detail).filter(([, v]) => v !== null && v !== "").map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`).join(" ")}</td>
                   <td className="mono faint">{a.hash.slice(0, 10)}…</td>
                 </tr>
               ))}
