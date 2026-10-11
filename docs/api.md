@@ -29,7 +29,7 @@ curl -s https://nw.example.com/api/v1/alerts?status=open -H "Authorization: Bear
 | Drafts | `GET /drafts`, `POST /drafts`, `POST /drafts/simulate`, `POST /drafts/{id}/approve`, `POST /drafts/{id}/reject` | read / author / approve |
 | Bundles | `GET /bundles`, `POST /bundles/publish`, `POST /bundles/{v}/advance`, `POST /bundles/{v}/rollback` | read / approve |
 | Fleet | `GET /nodes`, `POST /nodes/enrollment-tokens`, `POST /nodes/{id}/revoke` | read / fleet |
-| Users | `GET/POST /users`, `PATCH /users/{id}`, `POST /users/{id}/reset-password` | users |
+| Users | `GET/POST /users`, `PATCH /users/{id}`, `POST /users/{id}/reset-password`, `DELETE /users/{id}` (erase a person) | users |
 | Audit | `GET /audit`, `GET /audit/verify`, `GET /audit/export.csv` | audit |
 | Exports | `GET /flows/export.csv`, `GET /alerts/export.csv` (same filters as the lists, 50,000 rows at most) | read |
 | Notifications | `GET/POST /notifications/channels`, `PATCH/DELETE /notifications/channels/{id}`, `POST /notifications/channels/{id}/test`, `GET /notifications/deliveries` | integrations |

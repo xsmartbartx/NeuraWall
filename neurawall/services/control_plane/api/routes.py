@@ -243,6 +243,13 @@ def patch_user(user_id: int, body: UserPatch, cp: CP, actor: UserAdmin) -> dict[
     )
 
 
+@api.delete("/users/{user_id}", tags=["users"], status_code=204)
+def erase_user(user_id: int, cp: CP, actor: UserAdmin) -> None:
+    """Erase a person's identifying data (email, name, sign-in). The row stays so history keeps
+    its shape. Refused for yourself and for the last active administrator."""
+    cp.erase_user(actor.email, user_id)
+
+
 @api.post("/users/{user_id}/reset-password", tags=["users"])
 def reset_password(user_id: int, cp: CP, actor: UserAdmin) -> dict[str, str]:
     return {"temporary_password": cp.reset_password(actor.email, user_id)}

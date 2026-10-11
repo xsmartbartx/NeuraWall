@@ -272,7 +272,12 @@ class ControlPlane:
             last = s.scalars(select(db.AuditRow).order_by(db.AuditRow.seq.desc()).limit(1)).first()
             prev = AuditEntry.model_validate(last, from_attributes=True) if last else None
             e = build_entry(
-                prev=prev, ts=time.time(), actor=actor, action=action, target=target, detail=detail
+                prev=prev,
+                ts=time.time(),
+                actor=self._person_ref(s, actor),
+                action=action,
+                target=target,
+                detail=detail,
             )
             s.add(db.AuditRow(**e.model_dump()))
         self._emit_for_audit(action, target, detail or {})
@@ -297,6 +302,16 @@ class ControlPlane:
         if action.startswith("bundle.") and target.startswith("bundle:v"):
             data["version"] = int(target[8:]) if target[8:].isdigit() else 0
         self._emit(event_type, data)
+
+    @staticmethod
+    def _person_ref(s: Session, who: str) -> str:
+        """The audit chain names people by `user:<id>`, never by email. The chain cannot be edited,
+        so an email written into it could never be erased. System actors (a node id, `stripe`,
+        `system`) pass through unchanged."""
+        if "@" not in who:
+            return who
+        uid = s.scalar(select(db.User.id).where(db.User.email == who.lower().strip()))
+        return f"user:{uid}" if uid is not None else "user:unknown"
 
     def verify_audit(self) -> int:
         with self.db.session() as s:
@@ -448,8 +463,56 @@ class ControlPlane:
             s.add(u)
             s.flush()
             s.expunge(u)
-        self.audit(actor, "user.create", f"user:{u.id}", {"email": u.email, "role": role.value})
+        self.audit(actor, "user.create", f"user:{u.id}", {"role": role.value})
         return u
+
+    def _assignee_ref(self, assignee: str | None) -> str | None:
+        if not assignee:
+            return assignee
+        with self.db.session() as s:
+            return self._person_ref(s, assignee)
+
+    ERASED_DOMAIN = "erased.invalid"
+
+    def erase_user(self, actor: str, user_id: int) -> None:
+        """Remove what identifies a person: email, name, provider id and password, and the email
+        in the other tables that record who did something. The user row and its id stay, so history
+        keeps its shape and the audit chain (which only holds `user:<id>`) still verifies.
+        Entries written before this change may still hold the email; they cannot be edited."""
+        with self.db.session() as s:
+            u = s.get(db.User, user_id)
+            if u is None:
+                raise NotFound("user not found")
+            if u.email.endswith("@" + self.ERASED_DOMAIN):
+                raise ValidationFailure("this user is already erased")
+            if u.email == actor.lower():
+                raise PolicyViolation("you cannot erase your own account")
+            if u.role == Role.ADMIN.value and u.active:
+                admins = s.scalar(
+                    select(func.count())
+                    .select_from(db.User)
+                    .where(db.User.role == Role.ADMIN.value, db.User.active.is_(True))
+                )
+                if (admins or 0) <= 1:
+                    raise PolicyViolation("the last active administrator cannot be erased")
+            old, role = u.email, u.role
+            placeholder = f"erased-{u.id}@{self.ERASED_DOMAIN}"
+            u.email, u.name = placeholder, "Erased user"
+            u.external_id, u.auth_provider = None, "local"
+            u.password_hash = hash_password(secrets.token_urlsafe(48) + "aA1!")
+            u.active, u.must_change_password = False, False
+            u.sessions_valid_after = time.time()
+            # Other places that record who did something by email.
+            for model, column in (
+                (db.DraftRow, "created_by"),
+                (db.DraftRow, "decided_by"),
+                (db.EnrollmentToken, "created_by"),
+                (db.NotificationChannel, "created_by"),
+                (db.Alert, "assignee"),
+            ):
+                col = getattr(model, column)
+                s.execute(update(model).where(col == old).values({column: placeholder}))
+        self.audit(actor, "user.erase", f"user:{user_id}", {"role": role})
 
     def update_user(
         self,
@@ -1230,7 +1293,10 @@ class ControlPlane:
             s.flush()
             s.expunge(a)
         self.audit(
-            actor, "alert.update", f"alert:{alert_id}", {"status": status, "assignee": assignee}
+            actor,
+            "alert.update",
+            f"alert:{alert_id}",
+            {"status": status, "assignee": self._assignee_ref(assignee)},
         )
         return a
 
