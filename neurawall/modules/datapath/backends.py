@@ -27,7 +27,15 @@ from typing import Protocol
 
 from neurawall.core.errors import RecoverableError
 from neurawall.core.logging import get_logger
-from neurawall.core.models import Action, FlowRecord, PolicyBundle, Rule, RuleMode, Verdict
+from neurawall.core.models import (
+    Action,
+    FlowRecord,
+    PolicyBundle,
+    Rule,
+    RuleMatch,
+    RuleMode,
+    Verdict,
+)
 from neurawall.core.telemetry import REGISTRY
 
 log = get_logger(__name__)
@@ -144,41 +152,52 @@ def _verdict_stmt(rule: Rule) -> str:
     return f"counter drop {comment}"
 
 
+_Family = tuple[str | None, list[str], list[str]]
+
+
+def _address_families(m: RuleMatch) -> list[_Family]:
+    src4, src6 = _family_split(m.src_cidrs)
+    dst4, dst6 = _family_split(m.dst_cidrs)
+    has4, has6 = bool(src4 or dst4), bool(src6 or dst6)
+    if has4 and not has6:
+        return [("ip", src4, dst4)]
+    if has6 and not has4:
+        return [("ip6", src6, dst6)]
+    if has4 or has6:
+        return [("ip", src4, dst4), ("ip6", src6, dst6)]
+    return [(None, [], [])]
+
+
+def _rule_line(
+    rule: Rule, fam: str | None, src: list[str], dst: list[str], proto: str | None
+) -> str:
+    m = rule.match
+    parts: list[str] = []
+    if fam and src:
+        parts.append(f"{fam} saddr {{ {', '.join(src)} }}")
+    if fam and dst:
+        parts.append(f"{fam} daddr {{ {', '.join(dst)} }}")
+    if proto == "icmp":
+        parts.append("meta l4proto { icmp, ipv6-icmp }")
+    elif proto:
+        parts.append(f"meta l4proto {proto}")
+        if m.dst_ports:
+            parts.append(f"{proto} dport {{ {', '.join(str(p) for p in m.dst_ports)} }}")
+    parts.append(_verdict_stmt(rule))
+    return " ".join(parts)
+
+
 def compile_rule(rule: Rule) -> list[str]:
     """One or more nft rule lines for a static rule (split per address family)."""
     m = rule.match
-    lines: list[str] = []
-    src4, src6 = _family_split(m.src_cidrs)
-    dst4, dst6 = _family_split(m.dst_cidrs)
-    families: list[tuple[str | None, list[str], list[str]]] = []
-    if (src4 or dst4) and not (src6 or dst6):
-        families = [("ip", src4, dst4)]
-    elif (src6 or dst6) and not (src4 or dst4):
-        families = [("ip6", src6, dst6)]
-    elif src4 or dst4 or src6 or dst6:
-        families = [("ip", src4, dst4), ("ip6", src6, dst6)]
-    else:
-        families = [(None, [], [])]
     protos: list[str | None] = [p.value for p in m.protocols] or (
         ["tcp", "udp"] if m.dst_ports else []
     )
-    for fam, src, dst in families:
+    lines: list[str] = []
+    for fam, src, dst in _address_families(m):
         if fam and ((m.src_cidrs and not src) or (m.dst_cidrs and not dst)):
             continue  # this family has no addresses for a populated criterion
-        for proto in protos or [None]:
-            parts: list[str] = []
-            if fam and src:
-                parts.append(f"{fam} saddr {{ {', '.join(src)} }}")
-            if fam and dst:
-                parts.append(f"{fam} daddr {{ {', '.join(dst)} }}")
-            if proto == "icmp":
-                parts.append("meta l4proto { icmp, ipv6-icmp }")
-            elif proto:
-                parts.append(f"meta l4proto {proto}")
-                if m.dst_ports:
-                    parts.append(f"{proto} dport {{ {', '.join(str(p) for p in m.dst_ports)} }}")
-            parts.append(_verdict_stmt(rule))
-            lines.append(" ".join(parts))
+        lines.extend(_rule_line(rule, fam, src, dst, proto) for proto in protos or [None])
     return lines
 
 
