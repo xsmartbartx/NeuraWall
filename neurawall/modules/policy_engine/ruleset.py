@@ -6,6 +6,7 @@ import ipaddress
 
 from neurawall.core.models import (
     Evidence,
+    FlowRecord,
     HygieneFinding,
     Rule,
     RuleMatch,
@@ -13,8 +14,8 @@ from neurawall.core.models import (
 from neurawall.core.validation import domain_matches_suffix, ip_in_any
 
 
-def match_flow(match: RuleMatch, ev: Evidence) -> bool:
-    f = ev.flow
+def _header_match(match: RuleMatch, f: FlowRecord) -> bool:
+    """Layer 3/4 fields plus SNI and DNS names."""
     if match.protocols and f.protocol not in match.protocols:
         return False
     if match.directions and f.direction not in match.directions:
@@ -27,8 +28,10 @@ def match_flow(match: RuleMatch, ev: Evidence) -> bool:
         return False
     if match.sni_suffixes and not domain_matches_suffix(f.sni, match.sni_suffixes):
         return False
-    if match.dns_suffixes and not domain_matches_suffix(f.dns_qname, match.dns_suffixes):
-        return False
+    return not (match.dns_suffixes and not domain_matches_suffix(f.dns_qname, match.dns_suffixes))
+
+
+def _l7_match(match: RuleMatch, f: FlowRecord) -> bool:
     if match.http_path_prefixes:
         path = f.l7.http.path if f.l7 and f.l7.http else None
         if path is None or not any(path.startswith(p) for p in match.http_path_prefixes):
@@ -37,6 +40,12 @@ def match_flow(match: RuleMatch, ev: Evidence) -> bool:
         ja3 = f.l7.tls.ja3 if f.l7 and f.l7.tls else None
         if ja3 not in match.ja3:
             return False
+    return True
+
+
+def match_flow(match: RuleMatch, ev: Evidence) -> bool:
+    if not _header_match(match, ev.flow) or not _l7_match(match, ev.flow):
+        return False
     if match.labels and not any(
         c.label in match.labels and c.confidence >= match.min_label_confidence
         for c in ev.classifications
@@ -125,30 +134,35 @@ def _is_overly_broad(m: RuleMatch) -> bool:
     )
 
 
+def _shadow_finding(later: Rule, earlier_rules: list[Rule]) -> HygieneFinding | None:
+    """The first earlier rule that covers everything `later` could match, if any."""
+    for earlier in earlier_rules:
+        if not match_covers(earlier.match, later.match):
+            continue
+        kind = "redundant" if earlier.action == later.action else "shadowed"
+        if kind == "redundant":
+            tail = " with the same action."
+        else:
+            tail = f" and applies '{earlier.action}' instead of '{later.action}'."
+        return HygieneFinding(
+            rule_id=later.id,
+            kind=kind,
+            related_rule_id=earlier.id,
+            detail=(
+                f"{later.id} can never match: {earlier.id} (priority {earlier.priority})"
+                f" covers all its traffic" + tail
+            ),
+        )
+    return None
+
+
 def analyze_hygiene(rules: list[Rule]) -> list[HygieneFinding]:
     findings: list[HygieneFinding] = []
     ordered = order_rules(rules)
     for i, later in enumerate(ordered):
-        for earlier in ordered[:i]:
-            if match_covers(earlier.match, later.match):
-                kind = "redundant" if earlier.action == later.action else "shadowed"
-                findings.append(
-                    HygieneFinding(
-                        rule_id=later.id,
-                        kind=kind,
-                        related_rule_id=earlier.id,
-                        detail=(
-                            f"{later.id} can never match: {earlier.id} (priority {earlier.priority})"
-                            f" covers all its traffic"
-                            + (
-                                " with the same action."
-                                if kind == "redundant"
-                                else f" and applies '{earlier.action}' instead of '{later.action}'."
-                            )
-                        ),
-                    )
-                )
-                break
+        shadow = _shadow_finding(later, ordered[:i])
+        if shadow is not None:
+            findings.append(shadow)
         if later.action.is_blocking and _is_overly_broad(later.match):
             findings.append(
                 HygieneFinding(
