@@ -8,7 +8,7 @@ controlPlane:
   # run exactly one replica (scale vertically).
   resources:
     requests: { cpu: 250m, memory: 512Mi }
-    limits: { memory: 2Gi }
+    limits: { memory: 2Gi, ephemeral-storage: 1Gi }
   publicUrl: https://neurawall.example.com
   requireFourEyes: false
   demoMode: false

@@ -13,6 +13,7 @@ from collections import Counter
 from neurawall.core.models import Evidence, Rule, ThreatLabel, Verdict
 from neurawall.modules.llm_advisor import schemas
 
+_GENERIC_DESC = "anomalous traffic"
 _SEVERITY = {
     ThreatLabel.EXFILTRATION: "critical",
     ThreatLabel.C2_BEACON: "critical",
@@ -154,7 +155,7 @@ def draft_rule(evs: list[Evidence], rules: list[Rule]) -> schemas.LlmRuleDraft:
         conf = max((ev.anomaly.score for ev in evs if ev.anomaly), default=0.5) * 0.7
 
     covered = [r.id for r in rules if r.enabled and r.action.value == action]
-    desc = _DESCRIPTIONS.get(label, "anomalous traffic") if label else "anomalous traffic"
+    desc = _DESCRIPTIONS.get(label, _GENERIC_DESC) if label else _GENERIC_DESC
     rationale = (
         f"{len(evs)} flow(s) show {desc}. Sources: {', '.join(s for s, _ in srcs.most_common(3))}; "
         f"destinations: {', '.join(d for d, _ in dsts.most_common(3))}. "
@@ -175,14 +176,15 @@ def draft_rule(evs: list[Evidence], rules: list[Rule]) -> schemas.LlmRuleDraft:
 
 def summarize(evs: list[Evidence]) -> schemas.LlmAlertSummary:
     label, conf = _dominant(evs)
-    severity = (
-        _SEVERITY.get(label, "low")
-        if label
-        else ("medium" if any(ev.anomaly and ev.anomaly.score >= 0.8 for ev in evs) else "low")
-    )
+    if label:
+        severity = _SEVERITY.get(label, "low")
+    elif any(ev.anomaly and ev.anomaly.score >= 0.8 for ev in evs):
+        severity = "medium"
+    else:
+        severity = "low"
     srcs = sorted({ev.flow.src_ip for ev in evs})
     dsts = sorted({ev.flow.dst_ip for ev in evs})
-    desc = _DESCRIPTIONS.get(label, "anomalous traffic") if label else "anomalous traffic"
+    desc = _DESCRIPTIONS.get(label, _GENERIC_DESC) if label else _GENERIC_DESC
     title = (
         f"{label.value.replace('_', ' ').title() if label else 'Anomalous traffic'}: "
         f"{srcs[0]} → {dsts[0]}" + (f" (+{len(dsts) - 1})" if len(dsts) > 1 else "")

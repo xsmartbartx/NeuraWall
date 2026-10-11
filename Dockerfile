@@ -7,9 +7,9 @@
 FROM --platform=$BUILDPLATFORM node:22-alpine AS console
 WORKDIR /src/console
 COPY console/package.json console/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY console/ ./
-RUN npx tsc -b && npx vite build --outDir /out --emptyOutDir
+RUN ./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build --outDir /out --emptyOutDir
 
 # ---------------------------------------------------------------- python build
 FROM python:3.12-slim AS build
@@ -17,7 +17,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen --no-dev --no-install-project --extra postgres
+RUN uv sync --frozen --no-build --no-dev --no-install-project --extra postgres
 COPY neurawall/ ./neurawall/
 COPY --from=console /out ./neurawall/services/control_plane/static
 RUN uv sync --frozen --no-dev --extra postgres

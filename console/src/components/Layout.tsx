@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import type { Dashboard } from "../lib/api";
 import { useApi, useAuth, useTheme } from "../lib/hooks";
 
-export function Logo({ size = 26 }: { size?: number }) {
+export function Logo({ size = 26 }: Readonly<{ size?: number }>) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
       <rect width="32" height="32" rx="7" fill="var(--bg-raised)" stroke="var(--border-strong)" />

@@ -126,7 +126,8 @@ def test_community_never_reaches_the_model(tmp_path):
     cp, client = make(tmp_path, "community", fake)
     with client:
         assert cp.advisor.summarize_alert(evidence()).source == DraftSource.HEURISTIC
-        assert fake.calls == 0 and rows(cp) == []
+        assert fake.calls == 0
+        assert rows(cp) == []
         assert cp.advisor.mode == "offline"
         assert cp.llm_usage()["access"] == "none"
 
@@ -137,13 +138,15 @@ def test_refusals_count_but_errors_do_not(tmp_path):
     )
     with client:
         cp.advisor.summarize_alert(evidence())
-        assert [r.outcome for r in rows(cp)] == ["refused"] and cp.llm_calls_this_period() == 1
+        assert [r.outcome for r in rows(cp)] == ["refused"]
+        assert cp.llm_calls_this_period() == 1
     cp2, client2 = make(
         tmp_path / "e", "business", FakeClaude(RecoverableError("Claude API error 500"))
     )
     with client2:
         cp2.advisor.summarize_alert(evidence())
-        assert [r.outcome for r in rows(cp2)] == ["error"] and cp2.llm_calls_this_period() == 0
+        assert [r.outcome for r in rows(cp2)] == ["error"]
+        assert cp2.llm_calls_this_period() == 0
 
 
 def test_a_metering_failure_never_breaks_triage(tmp_path):
@@ -176,7 +179,8 @@ def test_usage_is_visible_through_the_api_and_billing(tmp_path):
         api = c.get("/api/v1/llm/usage", headers=h).json()
         assert (api["used"], api["budget"], api["mode"]) == (1, 10, "online")
         billing = c.get("/api/v1/billing", headers=h).json()
-        assert billing["usage"]["llm_calls"] == 1 and billing["usage"]["llm_budget"] == 10
+        assert billing["usage"]["llm_calls"] == 1
+        assert billing["usage"]["llm_budget"] == 10
         assert {p["id"]: p["llm_access"] for p in billing["plans"]}["pro"] == "own_key"
         system = c.get("/api/v1/system", headers=h).json()
         assert system["advisor"]["mode"] == "online"

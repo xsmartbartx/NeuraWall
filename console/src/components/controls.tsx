@@ -3,7 +3,7 @@ import { downloadCsv } from "../lib/api";
 import { useToast } from "../lib/hooks";
 
 /** An on/off switch. The state is announced (role=switch) and shown by position, not colour alone. */
-export function Toggle({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: ReactNode; disabled?: boolean }) {
+export function Toggle({ checked, onChange, label, disabled }: Readonly<{ checked: boolean; onChange: (v: boolean) => void; label: ReactNode; disabled?: boolean }>) {
   const id = useId();
   return (
     <span className="toggle-row">
@@ -16,7 +16,7 @@ export function Toggle({ checked, onChange, label, disabled }: { checked: boolea
 
 /** Shows a secret exactly once. It lives only in this component's state: not in the URL,
  *  not in storage, and gone when the dialog closes. */
-export function SecretReveal({ label, secret, onDone }: { label: string; secret: string; onDone: () => void }) {
+export function SecretReveal({ label, secret, onDone }: Readonly<{ label: string; secret: string; onDone: () => void }>) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="stack">
@@ -32,7 +32,7 @@ export function SecretReveal({ label, secret, onDone }: { label: string; secret:
   );
 }
 
-export function ExportButton({ path, filename }: { path: string; filename: string }) {
+export function ExportButton({ path, filename }: Readonly<{ path: string; filename: string }>) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   return (

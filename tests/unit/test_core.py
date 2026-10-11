@@ -120,7 +120,8 @@ def test_config_rejects_unknown_keys_and_layers(monkeypatch, tmp_path):
     monkeypatch.setenv("NEURAWALL_CONFIG", str(cfg))
     monkeypatch.setenv("NEURAWALL_LLM__MODEL", "from-env")
     s = load_settings()
-    assert s.port == 9000 and s.llm.model == "from-env"
+    assert s.port == 9000
+    assert s.llm.model == "from-env"
     assert load_settings(port=9100).port == 9100
     cfg.write_text("bogus: 1\n")
     with pytest.raises(ValidationError):

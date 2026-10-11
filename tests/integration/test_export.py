@@ -80,14 +80,13 @@ def test_flows_export_matches_the_filter_and_is_metadata_only(env):
     r = c.get("/api/v1/flows/export.csv?action=blocked", headers=h)
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/csv")
-    assert (
-        "attachment" in r.headers["content-disposition"]
-        and r.headers["cache-control"] == "no-store"
-    )
+    assert "attachment" in r.headers["content-disposition"]
+    assert r.headers["cache-control"] == "no-store"
     rows = parse(r)
     header, body = rows[0], rows[1:]
     assert "payload" not in " ".join(header)
-    assert body and all(row[header.index("enforced")] == "True" for row in body)
+    assert body
+    assert all(row[header.index("enforced")] == "True" for row in body)
     listed = c.get("/api/v1/flows?action=blocked&limit=500", headers=h).json()["total"]
     assert len(body) == listed
 
@@ -109,7 +108,8 @@ def test_alerts_and_audit_exports(env):
     cp, c, h = env
     ingest(cp)
     alerts = parse(c.get("/api/v1/alerts/export.csv", headers=h))
-    assert alerts[0][:3] == ["id", "status", "severity"] and len(alerts) > 1
+    assert alerts[0][:3] == ["id", "status", "severity"]
+    assert len(alerts) > 1
     audit = parse(c.get("/api/v1/audit/export.csv?action=export.", headers=h))
     assert audit[0][0] == "seq"
     actions = [r[3] for r in parse(c.get("/api/v1/audit/export.csv", headers=h))[1:]]

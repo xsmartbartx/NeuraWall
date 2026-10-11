@@ -65,7 +65,8 @@ def test_no_email_is_written_to_the_audit_chain(env):
     assert "@" not in text, text
     with cp.db.session() as s:
         actors = {r.actor for r in s.query(db.AuditRow).all()}
-    assert f"user:{uid}" in actors and "user:1" in actors  # people are named by id
+    assert f"user:{uid}" in actors
+    assert "user:1" in actors  # people are named by id
     assert cp.verify_audit() > 0
 
 
@@ -101,16 +102,19 @@ def test_erasing_removes_the_person_everywhere_and_the_chain_still_verifies(env)
     with cp.db.session() as s:
         u = s.get(db.User, uid)
         assert (u.email, u.name, u.active) == (f"erased-{uid}@erased.invalid", "Erased user", False)
-        assert u.external_id is None and u.auth_provider == "local"
+        assert u.external_id is None
+        assert u.auth_provider == "local"
         tokens = [t.created_by for t in s.query(db.EnrollmentToken).all()]
-    assert "ops@example.com" not in tokens and f"erased-{uid}@erased.invalid" in tokens
+    assert "ops@example.com" not in tokens
+    assert f"erased-{uid}@erased.invalid" in tokens
     assert cp.verify_audit() >= before  # the chain is intact (and has the erase entry)
     erased = [
         r
         for r in c.get("/api/v1/audit?limit=50", headers=h).json()["items"]
         if r["action"] == "user.erase"
     ]
-    assert erased and "@" not in json.dumps(erased)
+    assert erased
+    assert "@" not in json.dumps(erased)
     # They are out: the old email and password no longer work, and an existing session is dead.
     assert (
         c.post(

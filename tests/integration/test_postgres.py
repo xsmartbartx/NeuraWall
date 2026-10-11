@@ -44,11 +44,14 @@ def test_postgres_full_workflow(cp):
     cp.ingest("n1", [gen.benign() for _ in range(300)])
     cp.ingest("n1", gen.scenario("c2_beacon", 8) + gen.scenario("sql_injection", 6))
     dash = cp.dashboard(24)
-    assert dash["total_flows"] == 314 and dash["timeline"] and dash["labels"]
+    assert dash["total_flows"] == 314
+    assert dash["timeline"]
+    assert dash["labels"]
     alert = next(a for a in cp.list_alerts()[0] if "c2_beacon" in a.labels)
     triaged = cp.triage_alert(alert.id)
     rule = cp.approve_draft("approver", triaged.draft_id, mode=RuleMode.ENFORCE)
-    assert rule.id == "R-000008" and cp.latest_version() == 2
+    assert rule.id == "R-000008"
+    assert cp.latest_version() == 2
     assert cp.rollback_bundle("approver", 2, "test") == 3
     cp.run_maintenance()
     assert cp.verify_audit() >= 5

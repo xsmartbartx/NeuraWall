@@ -55,14 +55,16 @@ def test_enroll_sync_ship_and_enforce(env):
     assert (cfg.state_dir / "agent-state.json").stat().st_mode & 0o777 == 0o600
     agent.sync_bundle()
     st = agent.backend.state()
-    assert agent.state.applied_version == 1 and st.static_rules + st.dynamic_rules >= 1
+    assert agent.state.applied_version == 1
+    assert st.static_rules + st.dynamic_rules >= 1
 
     gen = TrafficGenerator(seed=12)
     docs = [gen.benign().model_dump(mode="json") for _ in range(300)]
     docs += [f.model_dump(mode="json") for f in gen.scenario("sql_injection", 10)]
     agent.source = ListSource(docs)
     agent.ship_flows()
-    assert agent.stats["flows_sent"] == 310 and agent.stats["verdicts_applied"] >= 1
+    assert agent.stats["flows_sent"] == 310
+    assert agent.stats["verdicts_applied"] >= 1
     assert agent.backend.state().active_blocks >= 1
     agent.heartbeat()
     assert cp.list_nodes()[0].stats["active_blocks"] >= 1
@@ -91,7 +93,8 @@ def test_rejects_forged_and_rolled_back_bundles(env):
 
         v1 = SignedEnvelope.model_validate(s.get(db.BundleRow, 1).envelope)
     assert not agent.apply_envelope(v1)
-    assert agent.state.applied_version == 2 and agent.stats["bundle_rejections"] == 2
+    assert agent.state.applied_version == 2
+    assert agent.stats["bundle_rejections"] == 2
 
 
 def test_last_known_good_survives_restart_without_control_plane(env, tmp_path):

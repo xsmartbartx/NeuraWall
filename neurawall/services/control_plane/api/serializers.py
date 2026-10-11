@@ -9,6 +9,12 @@ from neurawall.core.models import Verdict
 from neurawall.services.control_plane import db
 
 
+def _node_status(revoked: bool, online: bool) -> str:
+    if revoked:
+        return "revoked"
+    return "online" if online else "offline"
+
+
 def user(u: db.User) -> dict[str, Any]:
     return {
         "id": u.id,
@@ -35,7 +41,7 @@ def node(n: db.Node, latest_version: int) -> dict[str, Any]:
         "up_to_date": n.applied_version == latest_version,
         "enrolled_at": n.enrolled_at,
         "last_seen": n.last_seen,
-        "status": "revoked" if n.revoked else ("online" if online else "offline"),
+        "status": _node_status(n.revoked, online),
         "stats": n.stats or {},
     }
 

@@ -22,6 +22,7 @@ from neurawall.core.models import (
     TlsMeta,
 )
 
+_TLS12 = "TLS1.2"
 BENIGN_SITES = [
     "www.google.com",
     "outlook.office365.com",
@@ -237,7 +238,7 @@ class TrafficGenerator:
                 l7=L7Meta(
                     tls=TlsMeta(
                         sni="cdn-telemetry-sync.net",
-                        version="TLS1.2",
+                        version=_TLS12,
                         ja3=PY_REQUESTS_JA3,
                         claimed_client="chrome",
                     )
@@ -362,7 +363,7 @@ class TrafficGenerator:
                 l7=L7Meta(
                     tls=TlsMeta(
                         sni="files-transfer-now.top",
-                        version="TLS1.2",
+                        version=_TLS12,
                         ja3=CHROME_JA3,
                         claimed_client="chrome",
                     )
@@ -385,7 +386,7 @@ class TrafficGenerator:
                 l7=L7Meta(
                     tls=TlsMeta(
                         sni="update-check.example.org",
-                        version="TLS1.2",
+                        version=_TLS12,
                         ja3=PY_REQUESTS_JA3,
                         claimed_client="chrome",
                     )

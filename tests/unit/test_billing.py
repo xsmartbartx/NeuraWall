@@ -75,7 +75,8 @@ def test_entitlements_fail_closed():
 def test_node_quota():
     assert check_nodes(0, PLANS[PlanId.COMMUNITY]).allowed
     d = check_nodes(1, PLANS[PlanId.COMMUNITY])
-    assert not d.allowed and "Community plan includes 1 enforcement node;" in d.reason
+    assert not d.allowed
+    assert "Community plan includes 1 enforcement node;" in d.reason
     assert check_nodes(10_000, PLANS[PlanId.DEDICATED]).allowed
 
 
@@ -143,7 +144,8 @@ def test_checkout_and_portal_requests():
         plan_id="pro",
     ).startswith("https://checkout.stripe.com")
     path, form = seen[0]
-    assert path == "/v1/checkout/sessions" and form["mode"] == "subscription"
+    assert path == "/v1/checkout/sessions"
+    assert form["mode"] == "subscription"
     assert form["subscription_data[metadata][neurawall_installation]"] == INSTALL
     assert form["line_items[0][price]"] == "price_pro_m"
     assert client.create_portal(customer_id="cus_1", return_url="r").startswith("https://billing")
@@ -169,5 +171,6 @@ def test_empty_env_values_mean_billing_disabled():
             "plan": "business",
         },
     )
-    assert not s.billing.self_serve_enabled and s.billing.plan_by_price() == {}
+    assert not s.billing.self_serve_enabled
+    assert s.billing.plan_by_price() == {}
     assert s.billing.plan == "business"

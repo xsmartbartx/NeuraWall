@@ -55,7 +55,7 @@ export function Approvals() {
   );
 }
 
-export function SimulationView({ sim }: { sim: Simulation }) {
+export function SimulationView({ sim }: Readonly<{ sim: Simulation }>) {
   return (
     <div className="stack">
       <div className="row"><h3>Simulation</h3><span className="faint">replayed against {sim.flows_evaluated.toLocaleString()} recent flows</span></div>
@@ -71,7 +71,7 @@ export function SimulationView({ sim }: { sim: Simulation }) {
   );
 }
 
-function DraftDrawer({ id, onClose, onChange }: { id: string; onClose: () => void; onChange: () => void }) {
+function DraftDrawer({ id, onClose, onChange }: Readonly<{ id: string; onClose: () => void; onChange: () => void }>) {
   const { can } = useAuth();
   const { run, busy } = useAction();
   const { data: d, error, reload } = useApi<DraftRow>(`/drafts/${id}`);
@@ -162,7 +162,7 @@ const LIST_FIELDS: [keyof RuleMatch, string, string][] = [
   ["labels", "Threat labels", "sql_injection, c2_beacon"],
 ];
 
-function NewDraftModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+function NewDraftModal({ onClose, onCreated }: Readonly<{ onClose: () => void; onCreated: (id: string) => void }>) {
   const { run, busy } = useAction();
   const [name, setName] = useState("");
   const [rationale, setRationale] = useState("");

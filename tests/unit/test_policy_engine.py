@@ -33,18 +33,24 @@ def test_first_matching_rule_by_priority_wins():
     )
     drop = make_rule(2, action=Action.DROP, priority=20, match=RuleMatch(dst_ports=[443]))
     v = engine(drop, allow).evaluate(Evidence(flow=make_flow()))
-    assert v.action == Action.ALLOW and v.rule_id == "R-000001" and not v.enforced
+    assert v.action == Action.ALLOW
+    assert v.rule_id == "R-000001"
+    assert not v.enforced
 
 
 def test_enforced_drop_carries_rule_id():
     v = engine(make_rule(7, match=RuleMatch(dst_ports=[443]))).evaluate(Evidence(flow=make_flow()))
-    assert v.action == Action.DROP and v.enforced and v.rule_id == "R-000007"
+    assert v.action == Action.DROP
+    assert v.enforced
+    assert v.rule_id == "R-000007"
 
 
 def test_alert_only_rule_never_enforces():
     r = make_rule(3, mode=RuleMode.ALERT_ONLY, match=RuleMatch(dst_ports=[443]))
     v = engine(r).evaluate(Evidence(flow=make_flow()))
-    assert v.action == Action.ALERT and not v.enforced and v.rule_id == "R-000003"
+    assert v.action == Action.ALERT
+    assert not v.enforced
+    assert v.rule_id == "R-000003"
 
 
 def test_models_alone_cannot_block():
@@ -55,7 +61,9 @@ def test_models_alone_cannot_block():
         classifications=(classification(f.flow_id, ThreatLabel.C2_BEACON, 0.99),),
     )
     v = engine(make_rule(1, match=RuleMatch(dst_ports=[22]))).evaluate(ev)
-    assert v.action == Action.ALERT and not v.enforced and v.rule_id is None
+    assert v.action == Action.ALERT
+    assert not v.enforced
+    assert v.rule_id is None
 
 
 def test_label_rule_blocks_on_confident_classification():
@@ -96,9 +104,12 @@ def test_l7_matchers():
 def test_simulation_blast_radius():
     history = [Evidence(flow=make_flow(dst_port=443 if i < 3 else 80)) for i in range(100)]
     res = simulate(RuleMatch(dst_ports=[443]), Action.DROP, history, threshold=0.01)
-    assert res.flows_matched == 3 and res.blast_radius == 0.03 and res.exceeds_threshold
+    assert res.flows_matched == 3
+    assert res.blast_radius == 0.03
+    assert res.exceeds_threshold
     res = simulate(RuleMatch(dst_ports=[443]), Action.ALERT, history, threshold=0.01)
-    assert not res.exceeds_threshold and res.would_block == 0
+    assert not res.exceeds_threshold
+    assert res.would_block == 0
 
 
 def test_hygiene_detects_shadow_redundant_broad():
@@ -135,6 +146,7 @@ def test_rollout_stages():
     canary = sum(st.includes(n) for n in nodes) / len(nodes)
     assert 0.02 < canary < 0.09
     full = st.advance().advance()
-    assert full.complete and all(full.includes(n) for n in nodes)
+    assert full.complete
+    assert all(full.includes(n) for n in nodes)
     assert should_rollback(baseline_block_rate=0.01, canary_block_rate=0.05)
     assert not should_rollback(baseline_block_rate=0.01, canary_block_rate=0.015)
