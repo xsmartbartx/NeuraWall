@@ -63,7 +63,9 @@ def rows(model: type[BaseModel], prefix: str, env_prefix: str) -> list[str]:
         if isinstance(ann, type) and issubclass(ann, BaseModel):
             continue
         env = f"{env_prefix}{name.upper()}"
-        lines.append(f"| `{prefix}{name}` | `{env}` | {_type(f)} | {_default(f)} | {docs.get(name, '')} |")
+        lines.append(
+            f"| `{prefix}{name}` | `{env}` | {_type(f)} | {_default(f)} | {docs.get(name, '')} |"
+        )
     return lines
 
 
@@ -88,17 +90,32 @@ def main() -> None:
         "|---|---|---|---|---|",
         *rows(Settings, "", "NEURAWALL_"),
     ]
-    for section, cls in [("inference", config.InferenceSettings), ("llm", config.LlmSettings),
-                         ("policy", config.PolicySettings), ("auth", config.AuthSettings),
-                         ("billing", config.BillingSettings),
-                         ("nexora", config.NexoraSettings)]:
-        parts += ["", f"## `{section}`", "", "| Key | Environment | Type | Default | Description |",
-                  "|---|---|---|---|---|", *rows(cls, f"{section}.", f"NEURAWALL_{section.upper()}__")]
-    parts += ["", "## Production requirements", "",
-              "- `environment: production` refuses to start without `auth.secret_key`.",
-              "- Use PostgreSQL (`database_url: postgresql+psycopg://…`) for production; "
-              "SQLite is for single-host trials.",
-              "- The data directory holds the bundle-signing key: back it up and restrict access.", ""]
+    for section, cls in [
+        ("inference", config.InferenceSettings),
+        ("llm", config.LlmSettings),
+        ("policy", config.PolicySettings),
+        ("auth", config.AuthSettings),
+        ("billing", config.BillingSettings),
+        ("nexora", config.NexoraSettings),
+    ]:
+        parts += [
+            "",
+            f"## `{section}`",
+            "",
+            "| Key | Environment | Type | Default | Description |",
+            "|---|---|---|---|---|",
+            *rows(cls, f"{section}.", f"NEURAWALL_{section.upper()}__"),
+        ]
+    parts += [
+        "",
+        "## Production requirements",
+        "",
+        "- `environment: production` refuses to start without `auth.secret_key`.",
+        "- Use PostgreSQL (`database_url: postgresql+psycopg://…`) for production; "
+        "SQLite is for single-host trials.",
+        "- The data directory holds the bundle-signing key: back it up and restrict access.",
+        "",
+    ]
     OUT.write_text("\n".join(parts))
     print(f"wrote {OUT}")
 

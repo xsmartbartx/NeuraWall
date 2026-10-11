@@ -103,7 +103,8 @@ def render() -> str:
                 "rejected": "refused",
             }[outcome]
             path = case.path.replace("|", "\\|")
-            lines.append(f"| {case.technique} | `{path}` | {label} | {conf:.2f} | {case.note} |")
+            note = case.note.replace("|", "\\|")  # a pipe in a note would add a table column
+            lines.append(f"| {case.technique} | `{path}` | {label} | {conf:.2f} | {note} |")
         lines.append("")
     lines += ["## Known gaps, in plain words", ""]
     for case, outcome, _ in rows:

