@@ -80,6 +80,14 @@ class PolicySettings(_Section):
     require_four_eyes: bool = False
     #: Minimum dwell time per canary stage before auto-advance (5% -> 25% -> 100%).
     rollout_stage_seconds: int = Field(300, ge=0)
+    #: Without a matching rule, a Tier 2 label at or above this confidence raises an alert. It
+    #: never blocks: blocking needs a rule a person approved (the starter rule asks for 0.9).
+    #: Web-injection labels (SQL, command and template injection, path traversal, XSS) alert from
+    #: 0.5 whatever this is, or lower if this is lower: the evasion report shows a single strong
+    #: payload scores 0.5 to 0.62, and benign traffic did not reach 0.5 for those labels. Lowering
+    #: this value alerts on more of every other label too (DNS DGA reached 1.3% of benign flows
+    #: at 0.5 on synthetic traffic). Applies to bundles published from now on.
+    classifier_alert_threshold: float = Field(0.7, ge=0.3, le=1)
     #: Auto-rollback if canary nodes block this much more traffic than the rest.
     rollback_block_rate_increase: float = Field(0.02, ge=0, le=1)
     #: Seed a starter rule pack on first boot.

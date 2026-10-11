@@ -62,7 +62,7 @@ def test_label_rule_blocks_on_confident_classification():
     r = make_rule(5, match=RuleMatch(labels=[ThreatLabel.SQL_INJECTION], min_label_confidence=0.8))
     f = make_flow()
     weak = Evidence(
-        flow=f, classifications=(classification(f.flow_id, ThreatLabel.SQL_INJECTION, 0.5),)
+        flow=f, classifications=(classification(f.flow_id, ThreatLabel.SQL_INJECTION, 0.4),)
     )
     strong = Evidence(
         flow=f, classifications=(classification(f.flow_id, ThreatLabel.SQL_INJECTION, 0.9),)

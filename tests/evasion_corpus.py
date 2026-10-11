@@ -4,8 +4,8 @@ Each case is a request path (the detector inspects the path and query, nothing e
 label a human would expect. `expect` is what the detector does *today*:
 
 * ``caught``  : a finding with the expected label at confidence >= 0.3 (the detector's floor).
-* ``alert``   : caught at >= 0.7, which is the confidence at which the control plane raises an
-  alert on its own without a matching rule.
+* ``alert``   : caught at or above `policy.classifier_alert_threshold` (0.5 by default), the
+  confidence at which the control plane raises an alert on its own without a matching rule.
 * ``missed``  : a known gap. The test asserts the miss so that fixing the detector flips the
   test, and the report (docs/evasion-report.md) gets regenerated.
 
@@ -83,22 +83,8 @@ CASES: list[Case] = [
         "alert",
     ),
     Case("SQL injection", "tautology without quotes", "/item?id=1 AND 1=1", SQL, "caught"),
-    Case(
-        "SQL injection",
-        "time-based blind",
-        "/item?id=1;SELECT pg_sleep(5)--",
-        SQL,
-        "caught",
-        "a single strong pattern scores 0.50, under the alert-grade line",
-    ),
-    Case(
-        "SQL injection",
-        "stacked query",
-        "/item?id=1;DROP TABLE users--",
-        SQL,
-        "caught",
-        "a single strong pattern scores 0.62, under the alert-grade line",
-    ),
+    Case("SQL injection", "time-based blind", "/item?id=1;SELECT pg_sleep(5)--", SQL, "alert"),
+    Case("SQL injection", "stacked query", "/item?id=1;DROP TABLE users--", SQL, "alert"),
     Case(
         "SQL injection",
         "MySQL versioned comment",
@@ -127,30 +113,9 @@ CASES: list[Case] = [
     Case(
         "Command injection", "separator + cat", "/ping?host=1.1.1.1;cat /etc/passwd", CMD, "alert"
     ),
-    Case(
-        "Command injection",
-        "pipe + id",
-        "/ping?host=1.1.1.1|id",
-        CMD,
-        "caught",
-        "one pattern scores 0.62, under the alert-grade line",
-    ),
-    Case(
-        "Command injection",
-        "command substitution",
-        "/ping?host=$(whoami)",
-        CMD,
-        "caught",
-        "one pattern scores 0.62, under the alert-grade line",
-    ),
-    Case(
-        "Command injection",
-        "backticks",
-        "/ping?host=`id`",
-        CMD,
-        "caught",
-        "one pattern scores 0.62, under the alert-grade line",
-    ),
+    Case("Command injection", "pipe + id", "/ping?host=1.1.1.1|id", CMD, "alert"),
+    Case("Command injection", "command substitution", "/ping?host=$(whoami)", CMD, "alert"),
+    Case("Command injection", "backticks", "/ping?host=`id`", CMD, "alert"),
     Case(
         "Command injection",
         "${IFS} as whitespace",
@@ -163,8 +128,7 @@ CASES: list[Case] = [
         "base64 into a shell",
         "/ping?host=1;echo Y2F0IC9ldGMvcGFzc3dk|base64 -d|sh",
         CMD,
-        "caught",
-        "caught through the `| sh` rule alone (0.62)",
+        "alert",
     ),
     Case(
         "Command injection",
@@ -246,12 +210,7 @@ CASES: list[Case] = [
         "alert",
     ),
     Case(
-        "Path traversal",
-        "backslashes",
-        "/files?name=..\\..\\..\\windows\\win.ini",
-        TRAV,
-        "caught",
-        "one pattern scores 0.62, under the alert-grade line",
+        "Path traversal", "backslashes", "/files?name=..\\..\\..\\windows\\win.ini", TRAV, "alert"
     ),
     Case(
         "Path traversal",
@@ -279,30 +238,9 @@ CASES: list[Case] = [
         "a filter that strips ../ once turns this into ../../.. on the server; the detector does not recognise it",
     ),
     # ---- XSS
-    Case(
-        "XSS",
-        "script tag",
-        "/s?q=<script>alert(1)</script>",
-        XSS,
-        "caught",
-        "the canonical payload scores 0.62, under the alert-grade line",
-    ),
-    Case(
-        "XSS",
-        "mixed-case script tag",
-        "/s?q=<ScRiPt>alert(1)</sCrIpT>",
-        XSS,
-        "caught",
-        "0.62, under the alert-grade line",
-    ),
-    Case(
-        "XSS",
-        "URL-encoded script tag",
-        "/s?q=%3Cscript%3Ealert(1)%3C/script%3E",
-        XSS,
-        "caught",
-        "0.62, under the alert-grade line",
-    ),
+    Case("XSS", "script tag", "/s?q=<script>alert(1)</script>", XSS, "alert"),
+    Case("XSS", "mixed-case script tag", "/s?q=<ScRiPt>alert(1)</sCrIpT>", XSS, "alert"),
+    Case("XSS", "URL-encoded script tag", "/s?q=%3Cscript%3Ealert(1)%3C/script%3E", XSS, "alert"),
     Case(
         "XSS",
         "img onerror",

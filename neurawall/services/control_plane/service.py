@@ -774,7 +774,11 @@ class ControlPlane:
                 Rule.model_validate(r.data)
                 for r in s.scalars(select(db.RuleRow).where(db.RuleRow.deleted.is_(False)))
             ]
-            bundle = PolicyBundle(version=version, rules=rules)
+            bundle = PolicyBundle(
+                version=version,
+                rules=rules,
+                classifier_alert_threshold=self.settings.policy.classifier_alert_threshold,
+            )
             env = sign_bundle(bundle, self.signer)
             s.execute(
                 update(db.BundleRow)

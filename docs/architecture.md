@@ -97,7 +97,7 @@ applied**. During a canary rollout, the central verdicts match what each node en
 | Tier | Can do | Cannot do |
 |---|---|---|
 | 1 — anomaly | Raise a flow's score; with no matching rule, a score ≥ `anomaly_alert_threshold` raises an **alert** | Block |
-| 2 — classifier | Label with confidence + attributions; a label ≥ 0.7 without a matching rule raises an **alert**; label-scoped **rules** can block | Block without a rule |
+| 2 — classifier | Label with confidence + attributions; a label at or above `policy.classifier_alert_threshold` (0.7 by default; 0.5 for the web-injection labels) without a matching rule raises an **alert**; label-scoped **rules** can block | Block without a rule |
 | 3 — advisor | Summaries, narratives, explanations, `RuleDraft`s (always alert-only, schema-validated, simulated) | Create or change a `Rule`, publish a bundle |
 | Human | Approve drafts (optionally four-eyes), change rules, roll back bundles | Bypass the audit trail |
 | Policy engine | Turn signals into actions via rules | — |

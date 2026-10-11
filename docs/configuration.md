@@ -58,6 +58,7 @@ Configuration is layered: **defaults → YAML file → environment → runtime o
 | `policy.bundle_ttl_warning_seconds` | `NEURAWALL_POLICY__BUNDLE_TTL_WARNING_SECONDS` | int | `86400` | Nodes warn when running a bundle older than this (blueprint §3.3). |
 | `policy.require_four_eyes` | `NEURAWALL_POLICY__REQUIRE_FOUR_EYES` | bool | `False` | Four-eyes: the approver of a rule change must differ from its author. |
 | `policy.rollout_stage_seconds` | `NEURAWALL_POLICY__ROLLOUT_STAGE_SECONDS` | int | `300` | Minimum dwell time per canary stage before auto-advance (5% -> 25% -> 100%). |
+| `policy.classifier_alert_threshold` | `NEURAWALL_POLICY__CLASSIFIER_ALERT_THRESHOLD` | float | `0.7` |  |
 | `policy.rollback_block_rate_increase` | `NEURAWALL_POLICY__ROLLBACK_BLOCK_RATE_INCREASE` | float | `0.02` | Auto-rollback if canary nodes block this much more traffic than the rest. |
 | `policy.starter_rules` | `NEURAWALL_POLICY__STARTER_RULES` | bool | `True` | Seed a starter rule pack on first boot. |
 
