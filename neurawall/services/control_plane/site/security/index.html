@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NeuraWall security · Only approved rules can block</title>
+<meta name="description" content="How NeuraWall keeps AI out of the enforcement path: human-approved rules, signed bundles and a tamper-evident audit trail.">
+<meta name="color-scheme" content="light dark">
+<link rel="canonical" href="https://neurawall.onenexora.com/security/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="NeuraWall security · Only approved rules can block">
+<meta property="og:description" content="How NeuraWall keeps AI out of the enforcement path: human-approved rules, signed bundles and a tamper-evident audit trail.">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="/site.css">
+<script src="/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="parent"><div class="wrap">
+  <a class="brand" href="https://onenexora.com">NEXORA</a><span class="sep">/</span>
+  <a href="https://onenexora.com/products">Products</a><span class="sep">/</span><span>NeuraWall</span>
+  <div class="right"><a href="https://vigilo.onenexora.com">Vigilo</a><a href="https://docs.onenexora.com">Docs</a><a href="https://status.onenexora.com">Status</a></div>
+</div></div>
+<nav class="main" aria-label="NeuraWall"><div class="wrap">
+  <a class="logo" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--card)" stroke="var(--line)"/><path d="M6 9h20M6 16h20M6 23h20" stroke="var(--line)" stroke-width="2"/><path d="M11 9v7M21 16v7M16 23v-7" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.6" fill="var(--accent)"/></svg>NeuraWall</a>
+  <ul>
+    <li><a href="/#how">How it works</a></li>
+    <li><a href="/#features">Features</a></li>
+    <li><a href="/security/" aria-current="page">Security</a></li>
+    <li><a href="/pricing/">Pricing</a></li>
+    <li><a href="https://docs.onenexora.com">Docs</a></li>
+  </ul>
+  <div class="cta"><a class="btn ghost small" href="/app/">Sign in</a><a class="btn primary small" href="/pricing/">Get started</a></div>
+</div></nav>
+<main id="main">
+
+<section class="doc"><div class="wrap">
+  <p class="eyebrow">Security</p>
+  <h1>Designed so the AI cannot hurt you.</h1>
+  <p class="lede" style="margin-left:0">The rules that decide what is blocked are deterministic and human-approved. The models only help you find and write them.</p>
+
+  <h2>Only approved rules can block</h2>
+  <ul>
+    <li>Three tiers raise alerts: statistical anomaly detection, a layer-7 classifier, and the Claude advisor. None of them can enforce.</li>
+    <li>Only the policy engine blocks, and only through a rule a person approved. This boundary is enforced in the code base by an import contract, not by convention.</li>
+    <li>An AI-drafted rule is schema-checked, forced to start alert-only, and replayed against recent traffic before a person ever sees it.</li>
+  </ul>
+
+  <h2>Signed and verifiable</h2>
+  <ul>
+    <li>Rule bundles are signed with Ed25519. Nodes verify every bundle, refuse replays, and keep the last known good one.</li>
+    <li>Every change, approval and sign-in goes into a hash-chained audit trail that you can verify from the console.</li>
+    <li>The audit trail records opaque user ids, not email addresses, so a person can be erased without breaking the chain.</li>
+  </ul>
+
+  <h2>What it sees</h2>
+  <ul>
+    <li>NeuraWall analyses flow metadata, TLS fingerprints and DNS behaviour. It does not intercept or decrypt TLS, and payloads are not stored.</li>
+    <li>Claude receives flow metadata as delimited, untrusted data under a call budget. Text inside it is never treated as instructions.</li>
+    <li>Without a Claude key, an offline advisor runs on your own host and nothing leaves it.</li>
+  </ul>
+
+  <h2>Access and operations</h2>
+  <ul>
+    <li>Roles from viewer to admin, with optional four-eyes approval. Sign-in through NEXORA creates viewers only; roles are never taken from the identity provider.</li>
+    <li>Outbound webhooks are signed and SSRF-guarded: every address is checked, the connection is pinned and redirects are not followed.</li>
+    <li>Plan changes never change what nodes enforce, and nodes keep enforcing when the control plane is unreachable.</li>
+  </ul>
+
+  <h2>Report a vulnerability</h2>
+  <p>Follow the disclosure process in NEXORA's <a href="https://onenexora.com/.well-known/security.txt">security.txt</a>. See also the <a href="https://onenexora.com/security/architecture">NEXORA security architecture</a>.</p>
+</div></section>
+
+</main>
+<footer><div class="wrap">
+  <div class="cols">
+    <div><a class="logo" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--card)" stroke="var(--line)"/><path d="M6 9h20M6 16h20M6 23h20" stroke="var(--line)" stroke-width="2"/><path d="M11 9v7M21 16v7M16 23v-7" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.6" fill="var(--accent)"/></svg>NeuraWall</a><p>The AI-assisted firewall that never blocks on its own.<br>A <a href="https://onenexora.com">NEXORA</a> product.</p></div>
+    <div><h4>Product</h4><ul><li><a href="/#how">How it works</a></li><li><a href="/#features">Features</a></li><li><a href="/pricing/">Pricing</a></li><li><a href="/security/">Security</a></li></ul></div>
+    <div><h4>Resources</h4><ul><li><a href="https://docs.onenexora.com">Documentation</a></li><li><a href="https://status.onenexora.com">Status</a></li><li><a href="https://onenexora.com/changelog">Changelog</a></li><li><a href="/app/">Open the console</a></li></ul></div>
+    <div><h4>NEXORA</h4><ul><li><a href="https://onenexora.com">Platform</a></li><li><a href="https://vigilo.onenexora.com">Vigilo</a></li><li><a href="https://onenexora.com/legal/privacy">Privacy</a></li><li><a href="https://onenexora.com/legal/terms">Terms</a></li><li><a href="mailto:hello@onenexora.com">Contact</a></li></ul></div>
+  </div>
+  <div class="base"><span>© 2026 NEXORA. NeuraWall is proprietary software.</span><span>Prices in USD, billed in the NEXORA console.</span></div>
+</div></footer>
+</body>
+</html>

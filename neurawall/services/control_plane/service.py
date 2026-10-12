@@ -1712,12 +1712,12 @@ class ControlPlane:
         base = self.settings.public_url.rstrip("/")
         if event_type == _EVT_ALERT_CREATED:
             link, text = (
-                f"{base}/alerts/{ref}",
+                f"{base}/app/alerts/{ref}",
                 (f"NeuraWall {data.get('severity', '')} alert: {data.get('title', '')}"),
             )
         else:
             link, text = (
-                f"{base}/approvals/{ref}",
+                f"{base}/app/approvals/{ref}",
                 "NeuraWall: a rule draft is waiting for approval",
             )
         # `text` makes the same body work with Slack and Teams incoming webhooks.
@@ -2140,7 +2140,7 @@ class ControlPlane:
         plan = entitlements(plan_id)
         if plan.plan_id.value != plan_id or not plan.self_serve or not price:
             raise PolicyViolation(f"plan {plan_id!r} ({interval}) is not available for checkout")
-        base = f"{self.settings.public_url.rstrip('/')}/billing"
+        base = f"{self.settings.public_url.rstrip('/')}/app/billing"
         url = self._stripe().create_checkout(
             price_id=price,
             installation_id=self.installation_id,

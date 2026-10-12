@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NeuraWall · The AI-assisted firewall that never blocks on its own</title>
+<meta name="description" content="NeuraWall detects threats with three tiers of inference, drafts narrow rules with Claude, and enforces only what a person approved.">
+<meta name="color-scheme" content="light dark">
+<link rel="canonical" href="https://neurawall.onenexora.com/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:title" content="NeuraWall · The AI-assisted firewall that never blocks on its own">
+<meta property="og:description" content="NeuraWall detects threats with three tiers of inference, drafts narrow rules with Claude, and enforces only what a person approved.">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="/site.css">
+<script src="/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="parent"><div class="wrap">
+  <a class="brand" href="https://onenexora.com">NEXORA</a><span class="sep">/</span>
+  <a href="https://onenexora.com/products">Products</a><span class="sep">/</span><span>NeuraWall</span>
+  <div class="right"><a href="https://vigilo.onenexora.com">Vigilo</a><a href="https://docs.onenexora.com">Docs</a><a href="https://status.onenexora.com">Status</a></div>
+</div></div>
+<nav class="main" aria-label="NeuraWall"><div class="wrap">
+  <a class="logo" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--card)" stroke="var(--line)"/><path d="M6 9h20M6 16h20M6 23h20" stroke="var(--line)" stroke-width="2"/><path d="M11 9v7M21 16v7M16 23v-7" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.6" fill="var(--accent)"/></svg>NeuraWall</a>
+  <ul>
+    <li><a href="/#how">How it works</a></li>
+    <li><a href="/#features">Features</a></li>
+    <li><a href="/security/">Security</a></li>
+    <li><a href="/pricing/">Pricing</a></li>
+    <li><a href="https://docs.onenexora.com">Docs</a></li>
+  </ul>
+  <div class="cta"><a class="btn ghost small" href="/app/">Sign in</a><a class="btn primary small" href="/pricing/">Get started</a></div>
+</div></nav>
+<main id="main">
+
+<section class="hero"><div class="wrap">
+  <p class="eyebrow">NeuraWall · AI-assisted network security</p>
+  <h1>A firewall that never blocks on its own.</h1>
+  <p class="lede">Claude proposes the rule. You see what it would have blocked in your own traffic. A person approves it, and it rolls out in stages.</p>
+  <div class="actions"><a class="btn primary" href="/pricing/">Start free</a><a class="btn line" href="https://docs.onenexora.com">Read the docs</a></div>
+  <p class="fine">Free for one node. Sign in with your NEXORA account.</p>
+  
+<div class="pipeline">
+<svg viewBox="0 0 960 220" role="img" aria-label="Flow metadata is scored, Claude proposes an alert-only rule, a person approves it after a replay, then it rolls out to 5 percent, 25 percent, then all nodes">
+  <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".0"/><stop offset="1" stop-color="var(--accent)"/></linearGradient></defs>
+  <g font-family="-apple-system, Segoe UI, sans-serif" text-anchor="middle">
+    <g><rect x="8" y="50" width="200" height="120" rx="18" fill="var(--card)" stroke="var(--line)"/>
+      <text x="108" y="92" font-size="13" fill="var(--muted)">1 · WATCH</text><text x="108" y="124" font-size="20" font-weight="650" fill="var(--ink)">Flow metadata</text><text x="108" y="148" font-size="13" fill="var(--muted)">never decrypted</text></g>
+    <g><rect x="256" y="50" width="200" height="120" rx="18" fill="var(--card)" stroke="var(--line)"/>
+      <text x="356" y="92" font-size="13" fill="var(--muted)">2 · PROPOSE</text><text x="356" y="124" font-size="20" font-weight="650" fill="var(--ink)">Claude drafts</text><text x="356" y="148" font-size="13" fill="var(--muted)">alert-only rule</text></g>
+    <g><rect x="504" y="50" width="200" height="120" rx="18" fill="var(--card)" stroke="var(--accent)" stroke-width="2"/>
+      <text x="604" y="92" font-size="13" fill="var(--accent)">3 · APPROVE</text><text x="604" y="124" font-size="20" font-weight="650" fill="var(--ink)">You decide</text><text x="604" y="148" font-size="13" fill="var(--muted)">after a replay</text></g>
+    <g><rect x="752" y="50" width="200" height="120" rx="18" fill="var(--card)" stroke="var(--line)"/>
+      <text x="852" y="92" font-size="13" fill="var(--muted)">4 · ROLL OUT</text><text x="852" y="124" font-size="20" font-weight="650" fill="var(--ink)">5% → 25% → all</text><text x="852" y="148" font-size="13" fill="var(--muted)">auto-rollback</text></g>
+  </g>
+  <g stroke="var(--accent)" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M214 110h30m-7 -6l7 6-7 6"/><path d="M462 110h30m-7 -6l7 6-7 6"/><path d="M710 110h30m-7 -6l7 6-7 6"/></g>
+</svg>
+</div>
+
+</div></section>
+
+<section id="how"><div class="wrap">
+  <div class="center"><h2>Watch. Propose. Approve.</h2>
+  <p class="sub">Three tiers of inference raise the alert. Only a rule a person approved can ever block.</p></div>
+  <div class="steps">
+    <div class="step"><h3>Watch</h3><p>Statistics, machine learning and traffic classifiers read flow metadata. Nothing is decrypted, and payloads are never stored.</p></div>
+    <div class="step"><h3>Propose</h3><p>Claude triages the alert and drafts a narrow rule that starts alert-only. Without a Claude key, an offline advisor drafts it on your own host.</p></div>
+    <div class="step"><h3>Approve and roll out</h3><p>The draft is replayed against recent legitimate traffic first. A signed bundle goes to 5% of nodes, then 25%, then all, and rolls back if blocking jumps.</p></div>
+  </div>
+</div></section>
+
+<section class="dark" id="trust"><div class="wrap split">
+  <div>
+    <p class="eyebrow" style="color:var(--glow)">No black box</p>
+    <h2>See the blast radius before you ship.</h2>
+    <p class="sub" style="margin-bottom:0">Every draft shows how much of your legitimate traffic it would have matched. Every drop maps to a rule id you approved. Models can raise an alert, never a block.</p>
+    <ul class="checks">
+      <li>Replay against recent traffic before approval</li>
+      <li>Optional four-eyes: the author cannot approve their own rule</li>
+      <li>Downgrading a plan never changes what your nodes enforce</li>
+    </ul>
+  </div>
+  <div class="panel" role="img" aria-label="Illustration: a drafted rule with a replay result (sample values)">
+    <div class="head">Example draft · Quarantine host</div>
+    <div class="row"><span class="k">Proposed by</span><span>Tier 3 advisor</span></div>
+    <div class="row"><span class="k">Mode</span><span class="warn">alert-only</span></div>
+    <div class="row"><span class="k">Matched, last 24 h</span><span>312 flows</span></div>
+    <div class="row"><span class="k">Legitimate flows hit</span><span class="ok">0</span></div>
+    <div class="row"><span class="k">Rollout</span><span>5% → 25% → 100%</span></div>
+    <div class="row"><span class="k">Awaiting</span><span class="ok">approval</span></div>
+  </div>
+</div></section>
+
+<section id="features"><div class="wrap">
+  <div class="center"><h2>Built to be trusted.</h2>
+  <p class="sub">The parts a security team asks about first.</p></div>
+  <div class="grid">
+    <div class="tile"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span><h3>Works on encrypted traffic</h3><p>Flow metadata, TLS fingerprints and DNS behaviour. NeuraWall never intercepts TLS.</p></div>
+    <div class="tile"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3A4 4 0 0011 18.7l1-1"/></svg></span><h3>Tamper-evident history</h3><p>A hash-chained audit trail you can verify, and signed bundles that nodes check for themselves.</p></div>
+    <div class="tile"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9a14 14 0 0118 0"/><path d="M6 12.5a9 9 0 0112 0"/><path d="M9 16a4.5 4.5 0 016 0"/><circle cx="12" cy="19" r="1"/></svg></span><h3>Keeps enforcing offline</h3><p>If the control plane goes away, nodes keep running their last signed bundle.</p></div>
+    <div class="tile"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 00-14-4L4 9"/><path d="M4 4v5h5"/><path d="M4 13a8 8 0 0014 4l2-2"/><path d="M20 20v-5h-5"/></svg></span><h3>Staged rollout</h3><p>5%, 25%, then everything, with automatic rollback if blocking jumps.</p></div>
+    <div class="tile"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4l2-2z"/><path d="M10 21h4"/></svg></span><h3>Alerts where your team is</h3><p>Signed JSON webhooks for Slack, Teams or any receiver, plus CSV export.</p></div>
+    <div class="tile"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg></span><h3>Roles and sign-in</h3><p>Viewer to admin roles, optional four-eyes, and Sign in with your NEXORA account.</p></div>
+  </div>
+</div></section>
+
+<section class="alt"><div class="wrap">
+  <div class="center"><h2>Choose how you start.</h2>
+  <p class="sub">Free for one node. Add nodes and history as you grow.</p></div>
+  <div class="plans">
+    <div class="plan"><h3>Community</h3><div class="price">$0</div><div class="yearly">Free forever</div><ul><li>1 enforcement node</li><li>7-day retention</li><li>Offline advisor</li></ul><a class="btn line" href="/pricing/">See details</a></div>
+    <div class="plan feature"><h3>Pro <span class="tag">Popular</span></h3><div class="price">$149<small> / month</small></div><div class="yearly">$1,490 billed yearly</div><ul><li>5 enforcement nodes</li><li>7-day retention</li><li>Claude with your own key</li></ul><a class="btn primary" href="/pricing/">See details</a></div>
+    <div class="plan"><h3>Business</h3><div class="price">$499<small> / month</small></div><div class="yearly">$4,990 billed yearly</div><ul><li>25 enforcement nodes</li><li>30-day retention</li><li>Monthly Claude budget included</li></ul><a class="btn line" href="/pricing/">See details</a></div>
+    <div class="plan"><h3>Enterprise</h3><div class="price">$3,000<small> / month</small></div><div class="yearly">$30,000 billed yearly</div><ul><li>100 enforcement nodes</li><li>90-day retention</li><li>Monthly Claude budget included</li></ul><a class="btn line" href="/pricing/">See details</a></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="center"><h2>Questions, answered.</h2></div>
+  <div class="faq" style="margin-top:40px">
+    <details><summary>Does it decrypt my traffic?</summary><p>No. It analyses metadata and never intercepts TLS. That is a design decision, not a missing feature.</p></details>
+    <details><summary>Can the AI block my traffic by itself?</summary><p>No. A model can only raise an alert or draft an alert-only rule. A person approves any rule that enforces.</p></details>
+    <details><summary>What if Claude is unavailable, or I don't want to use it?</summary><p>An offline advisor does the same jobs deterministically, and nothing leaves your host.</p></details>
+    <details><summary>What happens if the control plane goes down?</summary><p>Nodes keep enforcing their last signed bundle. The console being down does not change what nodes enforce.</p></details>
+    <details><summary>What data does Claude see?</summary><p>Flow metadata, passed as delimited untrusted data under a call budget. Every drafted rule is schema-checked, forced to alert-only and simulated before a person sees it.</p></details>
+    <details><summary>Can I import my current rules?</summary><p>Not yet.</p></details>
+    <details><summary>Is it open source?</summary><p>No. NeuraWall is proprietary software.</p></details>
+  </div>
+</div></section>
+
+<section class="dark final"><div class="wrap">
+  <h2>Look at it before you trust it.</h2>
+  <p class="sub">Start on the free plan and run the quickstart on your own machine.</p>
+  <div class="actions"><a class="btn primary" href="/pricing/">Start free</a><a class="btn line on-dark" href="https://docs.onenexora.com">Read the docs</a></div>
+</div></section>
+
+</main>
+<footer><div class="wrap">
+  <div class="cols">
+    <div><a class="logo" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--card)" stroke="var(--line)"/><path d="M6 9h20M6 16h20M6 23h20" stroke="var(--line)" stroke-width="2"/><path d="M11 9v7M21 16v7M16 23v-7" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.6" fill="var(--accent)"/></svg>NeuraWall</a><p>The AI-assisted firewall that never blocks on its own.<br>A <a href="https://onenexora.com">NEXORA</a> product.</p></div>
+    <div><h4>Product</h4><ul><li><a href="/#how">How it works</a></li><li><a href="/#features">Features</a></li><li><a href="/pricing/">Pricing</a></li><li><a href="/security/">Security</a></li></ul></div>
+    <div><h4>Resources</h4><ul><li><a href="https://docs.onenexora.com">Documentation</a></li><li><a href="https://status.onenexora.com">Status</a></li><li><a href="https://onenexora.com/changelog">Changelog</a></li><li><a href="/app/">Open the console</a></li></ul></div>
+    <div><h4>NEXORA</h4><ul><li><a href="https://onenexora.com">Platform</a></li><li><a href="https://vigilo.onenexora.com">Vigilo</a></li><li><a href="https://onenexora.com/legal/privacy">Privacy</a></li><li><a href="https://onenexora.com/legal/terms">Terms</a></li><li><a href="mailto:hello@onenexora.com">Contact</a></li></ul></div>
+  </div>
+  <div class="base"><span>© 2026 NEXORA. NeuraWall is proprietary software.</span><span>Prices in USD, billed in the NEXORA console.</span></div>
+</div></footer>
+</body>
+</html>

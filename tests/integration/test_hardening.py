@@ -32,9 +32,9 @@ def _login(c):
 @pytest.fixture
 def static_client(tmp_path, monkeypatch):
     static = tmp_path / "static"
-    static.mkdir()
-    (static / "index.html").write_text("<html>console</html>")
-    (static / "app.txt").write_text("asset")
+    (static / "app").mkdir(parents=True)  # the console is served under /app
+    (static / "app" / "index.html").write_text("<html>console</html>")
+    (static / "app" / "app.txt").write_text("asset")
     (tmp_path / "secret.txt").write_text("TOP SECRET")
     monkeypatch.setattr(app_module, "STATIC_DIR", static)
     settings = _settings(tmp_path / "data")
@@ -44,11 +44,11 @@ def static_client(tmp_path, monkeypatch):
 
 
 def test_static_serving_survives_odd_paths(static_client):
-    assert static_client.get("/app.txt").text == "asset"
+    assert static_client.get("/app/app.txt").text == "asset"
     # An embedded NUL byte is a 404, not a 500.
-    assert static_client.get("/app%00.txt").status_code == 404
+    assert static_client.get("/app/app%00.txt").status_code == 404
     # Traversal falls back to the SPA shell and never serves the file outside the folder.
-    for path in ("/..%2fsecret.txt", "/%2e%2e/secret.txt", "/..%2f..%2fetc/passwd"):
+    for path in ("/app/..%2fsecret.txt", "/app/%2e%2e/secret.txt", "/app/..%2f..%2fetc/passwd"):
         r = static_client.get(path)
         assert "TOP SECRET" not in r.text
         assert "root:" not in r.text
