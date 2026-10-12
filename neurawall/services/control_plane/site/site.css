@@ -61,7 +61,7 @@ nav.main ul a { color: var(--muted); }
 nav.main ul a:hover, nav.main ul a[aria-current="page"] { color: var(--ink); text-decoration: none; }
 nav.main .cta { margin-left: auto; display: flex; gap: 10px; align-items: center; }
 
-.btn { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 11px 22px; font-weight: 600; font-size: 15px; border: 1px solid transparent; cursor: pointer; }
+.btn { white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 11px 22px; font-weight: 600; font-size: 15px; border: 1px solid transparent; cursor: pointer; }
 .btn:hover { text-decoration: none; }
 .btn.primary { background: var(--accent); color: var(--accent-ink); }
 .btn.primary:hover { filter: brightness(1.08); }
@@ -176,6 +176,10 @@ footer .base { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--
   footer .cols { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 680px) {
+  nav.main .wrap { gap: 12px; }
+  nav.main .cta { gap: 4px; }
+  .pipeline { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+  .pipeline svg { min-width: 640px; }
   body { font-size: 16px; }
   .parent .right, nav.main ul { display: none; }
   .plans, .grid, .steps { grid-template-columns: 1fr; }
