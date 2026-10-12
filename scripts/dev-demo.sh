@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run the control plane locally with synthetic demo traffic.
-# Console: http://localhost:8080  (admin@neurawall.local / Demo-Admin-Pass-1!)
+# Console: http://localhost:8080/app/  (product site at /; admin@neurawall.local / Demo-Admin-Pass-1!)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export NEURAWALL_DEMO_MODE=true

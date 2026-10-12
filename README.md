@@ -23,7 +23,7 @@ engine *decides*. A human *approves* anything that widens a block.
 docker compose -f deploy/compose/quickstart.yml up
 ```
 
-Open <http://localhost:8080> and sign in as `admin@neurawall.local` / `Quickstart-Admin-1!`.
+Open <http://localhost:8080/app/> (the product site is at `/`) and sign in as `admin@neurawall.local` / `Quickstart-Admin-1!`.
 Demo mode streams synthetic enterprise traffic with occasional attacks, so the dashboards,
 alerts and AI rule drafts fill in within a minute.
 

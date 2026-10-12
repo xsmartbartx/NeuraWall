@@ -19,7 +19,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-build --no-dev --no-install-project --extra postgres
 COPY neurawall/ ./neurawall/
-COPY --from=console /out ./neurawall/services/control_plane/static
+COPY --from=console /out ./neurawall/services/control_plane/static/app
 RUN uv sync --frozen --no-dev --extra postgres
 
 # ---------------------------------------------------------------- runtime

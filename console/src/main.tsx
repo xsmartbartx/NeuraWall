@@ -53,7 +53,7 @@ function App() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/app">
       <ToastProvider>
         <AuthProvider>
           <App />

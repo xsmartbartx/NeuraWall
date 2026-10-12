@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from neurawall import __version__
@@ -37,6 +37,7 @@ _latency = REGISTRY.histogram("neurawall_http_request_seconds", "HTTP request la
 
 MAX_BODY_BYTES = 8 * 1024 * 1024
 STATIC_DIR = Path(__file__).parent / "static"
+SITE_DIR = Path(__file__).parent / "site"
 
 _STATUS: list[tuple[type[NeuraWallError], int]] = [
     (Unauthenticated, 401),
@@ -168,34 +169,79 @@ def create_app(
     return app
 
 
+#: Console routes that used to live at the root. Links already sent (alert webhooks, bookmarks)
+#: still work: they redirect to the same page under /app.
+_LEGACY_CONSOLE_ROUTES = frozenset(
+    {
+        "alerts",
+        "approvals",
+        "audit",
+        "billing",
+        "bundles",
+        "fleet",
+        "flows",
+        "integrations",
+        "login",
+        "overview",
+        "rules",
+        "settings",
+        "users",
+    }
+)
+_RESERVED_PREFIXES = ("api/", "healthz", "readyz", "metrics")
+
+
+def _safe_file(root: Path, rel: str) -> Path | None:
+    """`rel` under `root` if it names a regular file inside it, else None."""
+    base = os.path.realpath(root)
+    try:
+        full = os.path.realpath(os.path.join(base, rel))
+    except (ValueError, OSError):  # e.g. an embedded NUL byte: not a file, not a 500
+        return None
+    if full.startswith(base + os.sep) and os.path.isfile(full):
+        return Path(full)
+    return None
+
+
 def _mount_console(app: FastAPI) -> None:
-    index = STATIC_DIR / "index.html"
-    if not index.exists():
+    """The product site at `/`, the operator console under `/app`."""
+    console_dir = STATIC_DIR / "app"
+    index = console_dir / "index.html"
+    if (console_dir / "assets").is_dir():
+        app.mount("/app/assets", StaticFiles(directory=console_dir / "assets"), name="assets")
 
-        @app.get("/", include_in_schema=False)
-        def no_console() -> JSONResponse:
+    @app.get("/app", include_in_schema=False)
+    def app_root() -> Response:
+        return RedirectResponse("/app/", status_code=308)
+
+    @app.get("/app/{path:path}", include_in_schema=False)
+    def console(path: str) -> Response:
+        if not index.exists():
             return JSONResponse(
-                {
-                    "service": "neurawall",
-                    "version": __version__,
-                    "console": "not built — run `npm run build` in console/",
-                    "api_docs": _DOCS_PATH,
-                }
+                {"error": "console_not_built", "hint": "run `npm run build` in console/"},
+                status_code=404,
             )
-
-        return
-    if (STATIC_DIR / "assets").is_dir():
-        app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+        if "\x00" in path:  # not a file and not a client route: a 404, never a 500
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        found = _safe_file(console_dir, path) if path else None
+        if found is not None:
+            return FileResponse(found)
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
     @app.get("/{path:path}", include_in_schema=False)
-    def spa(path: str) -> Response:
-        if path.startswith(("api/", "healthz", "readyz", "metrics")):
+    def site(request: Request, path: str) -> Response:
+        if path.startswith(_RESERVED_PREFIXES):
             return JSONResponse({"error": "not_found"}, status_code=404)
-        root = os.path.realpath(STATIC_DIR)
-        try:
-            full = os.path.realpath(os.path.join(root, path))
-        except (ValueError, OSError):  # e.g. an embedded NUL byte: not a file, not a 500
-            return JSONResponse({"error": "not_found"}, status_code=404)
-        if path and full.startswith(root + os.sep) and os.path.isfile(full):
-            return FileResponse(full)
-        return FileResponse(index, headers={"Cache-Control": "no-cache"})
+        first = path.split("/", 1)[0]
+        if first in _LEGACY_CONSOLE_ROUTES:
+            query = f"?{request.url.query}" if request.url.query else ""
+            return RedirectResponse(f"/app/{path}{query}", status_code=308)
+        rel = path.rstrip("/")
+        for candidate in (rel, f"{rel}/index.html" if rel else "index.html"):
+            found = _safe_file(SITE_DIR, candidate)
+            if found is not None:
+                return FileResponse(found, headers={"Cache-Control": "public, max-age=300"})
+        not_found = SITE_DIR / "404.html"
+        if not_found.exists():
+            return FileResponse(not_found, status_code=404)
+        return JSONResponse({"error": "not_found"}, status_code=404)
