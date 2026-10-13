@@ -111,6 +111,7 @@ section.dark .tile .ico { background: #11261d; color: var(--glow); }
 .panel { background: var(--dark); border: 1px solid var(--dark-line); border-radius: var(--radius); padding: 22px; color: var(--dark-ink); font-family: var(--mono); font-size: 13.5px; line-height: 1.7; box-shadow: 0 30px 60px -30px rgba(0, 0, 0, .45); }
 .panel .row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--dark-line); }
 .panel .row:last-child { border: 0; }
+.panel .row span { overflow-wrap: anywhere; min-width: 0; }
 .panel .k { color: var(--dark-muted); }
 .panel .ok { color: var(--glow); }
 .panel .warn { color: #f0b429; }
@@ -173,6 +174,7 @@ footer .base { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--
   .plans { grid-template-columns: repeat(2, 1fr); }
   .grid, .steps { grid-template-columns: 1fr 1fr; }
   .split { grid-template-columns: 1fr; gap: 32px; }
+  .split > * { min-width: 0; }
   footer .cols { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 680px) {
