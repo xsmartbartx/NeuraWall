@@ -12,7 +12,16 @@ def test_the_product_site_is_served_at_the_root(env):
 
 def test_site_pages_and_assets(env):
     _, c, _ = env
-    for path in ("/pricing/", "/pricing", "/security/", "/site.css", "/site.js", "/favicon.svg"):
+    for path in (
+        "/pricing/",
+        "/pricing",
+        "/security/",
+        "/docs/",
+        "/docs/detection/",
+        "/site.css",
+        "/site.js",
+        "/favicon.svg",
+    ):
         assert c.get(path).status_code == 200, path
 
 
@@ -49,3 +58,11 @@ def test_the_sso_handoff_script_forwards_the_fragment_to_the_console(env):
     js = c.get("/site.js").text
     assert "#sso_token=" in js
     assert '"/app/"' in js
+
+
+def test_the_docs_landing_links_to_the_live_api_reference(env):
+    _, c, _ = env
+    page = c.get("/docs/").text
+    assert 'href="/api/docs"' in page
+    assert 'href="/docs/detection/"' in page
+    assert c.get("/api/docs").status_code == 200

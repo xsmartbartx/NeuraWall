@@ -82,7 +82,7 @@ def page(*, title: str, description: str, path: str, current: str, body: str) ->
     <li><a href="/#features">Features</a></li>
     <li><a href="/security/"{cur("security")}>Security</a></li>
     <li><a href="/pricing/"{cur("pricing")}>Pricing</a></li>
-    <li><a href="{DOCS}">Docs</a></li>
+    <li><a href="/docs/"{cur("docs")}>Docs</a></li>
   </ul>
   <div class="cta"><a class="btn ghost small" href="/app/">Sign in</a><a class="btn primary small" href="/pricing/">Get started</a></div>
 </div></nav>
@@ -93,7 +93,7 @@ def page(*, title: str, description: str, path: str, current: str, body: str) ->
   <div class="cols">
     <div><a class="logo" href="/">{LOGO}NeuraWall</a><p>The AI-assisted firewall that never blocks on its own.<br>A <a href="{NEXORA}">NEXORA</a> product.</p></div>
     <div><h4>Product</h4><ul><li><a href="/#how">How it works</a></li><li><a href="/#features">Features</a></li><li><a href="/pricing/">Pricing</a></li><li><a href="/security/">Security</a></li></ul></div>
-    <div><h4>Resources</h4><ul><li><a href="{DOCS}">Documentation</a></li><li><a href="https://status.onenexora.com">Status</a></li><li><a href="{NEXORA}/changelog">Changelog</a></li><li><a href="/app/">Open the console</a></li></ul></div>
+    <div><h4>Resources</h4><ul><li><a href="/docs/">Documentation</a></li><li><a href="/api/docs">API reference</a></li><li><a href="https://status.onenexora.com">Status</a></li><li><a href="{NEXORA}/changelog">Changelog</a></li><li><a href="/app/">Open the console</a></li></ul></div>
     <div><h4>NEXORA</h4><ul><li><a href="{NEXORA}">Platform</a></li><li><a href="{VIGILO}">Vigilo</a></li><li><a href="{NEXORA}/legal/privacy">Privacy</a></li><li><a href="{NEXORA}/legal/terms">Terms</a></li><li><a href="mailto:hello@onenexora.com">Contact</a></li></ul></div>
   </div>
   <div class="base"><span>© 2026 NEXORA. NeuraWall is proprietary software.</span><span>Prices in USD, billed in the NEXORA console.</span></div>
@@ -320,6 +320,126 @@ def security() -> str:
     )
 
 
+def card(title: str, body: str, href: str | None = None) -> str:
+    head = f'<a href="{href}">{title}</a>' if href else title
+    return f'<div class="tile"><h3>{head}</h3><p>{body}</p></div>'
+
+
+def docs() -> str:
+    body = f"""
+<section class="hero" style="padding-bottom:40px"><div class="wrap">
+  <p class="eyebrow">Documentation</p>
+  <h1>Learn NeuraWall.</h1>
+  <p class="lede">Run it in five minutes, understand how it decides, and look up the details.</p>
+  <div class="actions"><a class="btn primary" href="#quickstart">Quickstart</a><a class="btn line" href="/api/docs">API reference</a></div>
+</div></section>
+
+<section id="quickstart" style="padding-top:32px"><div class="wrap split">
+  <div>
+    <h2>Quickstart</h2>
+    <p class="sub" style="margin-bottom:0">Five minutes, on your own machine. Demo mode streams synthetic traffic with occasional attacks, so the dashboards, alerts and AI rule drafts fill in within a minute.</p>
+    <ol class="checks" style="list-style:none">
+      <li>Start the stack with Docker Compose.</li>
+      <li>Open the console at <code>/app/</code> on port 8080.</li>
+      <li>Sign in with the local demo account, then open Alerts and Approvals.</li>
+    </ol>
+  </div>
+  <div class="panel">
+    <div class="head">Terminal</div>
+    <div class="row"><span>docker compose -f deploy/compose/quickstart.yml up</span></div>
+    <div class="row"><span class="k">Console</span><span>http://localhost:8080/app/</span></div>
+    <div class="row"><span class="k">Local demo login</span><span>admin@neurawall.local</span></div>
+  </div>
+</div></section>
+
+<section class="alt"><div class="wrap">
+  <h2>Concepts</h2>
+  <p class="sub">The ideas the rest of the product is built on.</p>
+  <div class="grid">
+    {card("Three tiers, one decision", "Tier 1 scores flow behaviour, Tier 2 classifies traffic, Tier 3 (Claude, or an offline advisor) drafts rules. None of them can block. Only the policy engine decides, and every drop maps to a rule id.")}
+    {card("What it sees without decrypting", "Flow shape, timing, TLS handshake fields and DNS names. NeuraWall never intercepts TLS and never stores payloads.", "/docs/detection/")}
+    {card("Signed bundles", "Every rule change produces an Ed25519-signed bundle. Nodes verify it themselves, refuse older versions and keep the last known good one if the control plane is unreachable.")}
+    {card("Safe change management", "Each draft is replayed against recent legitimate traffic. A staged rollout (5%, 25%, all) rolls back automatically if blocking jumps. Optional four-eyes approval.")}
+    {card("Audit trail", "A hash-chained record of every change, approval and sign-in that you can verify from the console. It records opaque user ids, never email addresses.")}
+    {card("Plans and NEXORA", "One installation links to one NEXORA organisation, and its plan is pulled from NEXORA. A plan change never changes what nodes enforce.", "/pricing/")}
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Deploy</h2>
+  <p class="sub">Enforcement nodes run the agent next to a flow sensor (Zeek is recommended). They enforce through nftables on Linux, or in dry-run mode to evaluate without touching the host.</p>
+  <div class="grid">
+    {card("Single host", "Docker Compose with PostgreSQL and automatic HTTPS.")}
+    {card("Kubernetes", "A Helm chart: the control plane plus the agent as a DaemonSet.")}
+    {card("Bare metal or VM", "systemd units for the control plane and the agent.")}
+  </div>
+  <p class="note">The deployment guide, configuration reference and operations runbook ship with the product.</p>
+</div></section>
+
+<section class="alt"><div class="wrap">
+  <h2>Reference</h2>
+  <div class="grid">
+    {card("REST API", "Interactive OpenAPI documentation, served by your own control plane.", "/api/docs")}
+    {card("Configuration", "Settings are environment variables prefixed with NEURAWALL_, with nested sections separated by a double underscore. Setting ANTHROPIC_API_KEY turns on Claude for Tier 3.")}
+    {card("Health and metrics", "/healthz and /readyz for probes, and Prometheus metrics at /metrics.")}
+  </div>
+</div></section>
+
+<section class="dark final"><div class="wrap">
+  <h2>Need a hand?</h2>
+  <p class="sub">Ask the team, or read the platform documentation.</p>
+  <div class="actions"><a class="btn primary" href="mailto:hello@onenexora.com?subject=NeuraWall">Contact us</a><a class="btn line on-dark" href="{DOCS}">NEXORA documentation</a></div>
+</div></section>
+"""
+    return page(
+        title="NeuraWall documentation",
+        description="Quickstart, concepts, deployment and reference for NeuraWall, the AI-assisted firewall.",
+        path="/docs/",
+        current="docs",
+        body=body,
+    )
+
+
+def detection() -> str:
+    body = """
+<section class="doc"><div class="wrap">
+  <p class="eyebrow"><a href="/docs/">Documentation</a></p>
+  <h1>What NeuraWall detects without decrypting.</h1>
+  <p class="lede" style="margin-left:0">NeuraWall never decrypts traffic and never stores payloads. It works from flow metadata, so what it can find depends on what the sensor can see.</p>
+
+  <h2>Visible in encrypted traffic</h2>
+  <div class="scroll"><table class="compare">
+    <thead><tr><th>Signal</th><th>Used by</th><th>What it can find</th></tr></thead>
+    <tbody>
+      <tr><td>Flow shape: bytes in and out, packet counts, durations, timing</td><td>Tier 1 anomaly engine (Isolation Forest, EWMA baselines)</td><td>A host that suddenly behaves differently, scans, floods</td></tr>
+      <tr><td>Inter-arrival timing of one flow</td><td>Beacon detector</td><td>Regular call-backs to a server (C2 beaconing)</td></tr>
+      <tr><td>Volume and direction</td><td>Exfiltration detector</td><td>Very large outbound transfers (20 MB and up)</td></tr>
+      <tr><td>TLS handshake: SNI, TLS version, JA3 / JA4, ALPN</td><td>TLS mismatch detector</td><td>A client claiming to be a browser with a non-browser fingerprint</td></tr>
+      <tr><td>DNS query names</td><td>DNS detector</td><td>DGA-looking names and DNS tunnelling</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Needs the request visible</h2>
+  <div class="scroll"><table class="compare">
+    <thead><tr><th>Needs the request visible (plain HTTP, or a sensor behind your TLS terminator)</th><th>Used by</th></tr></thead>
+    <tbody><tr><td>HTTP path and query</td><td>Injection detector: SQL, command and template injection, path traversal, XSS</td></tr></tbody>
+  </table></div>
+
+  <h2>The honest limit</h2>
+  <p>On a public HTTPS service the injection detector sees nothing unless the sensor sits behind the TLS terminator, or you already run sensor-side decryption. Tier 1 and the signals in the first table work either way.</p>
+  <p>The detectors are heuristics with known gaps. A detector can only raise an alert; a person approves any rule that blocks.</p>
+  <p><a class="btn line" href="/docs/">Back to documentation</a></p>
+</div></section>
+"""
+    return page(
+        title="What NeuraWall detects without decrypting · NeuraWall docs",
+        description="Which signals NeuraWall uses on encrypted traffic, what needs the request visible, and the honest limits.",
+        path="/docs/detection/",
+        current="docs",
+        body=body,
+    )
+
+
 def not_found() -> str:
     body = """
 <section class="hero"><div class="wrap">
@@ -360,9 +480,12 @@ def main() -> None:
     SITE.mkdir(parents=True, exist_ok=True)
     (SITE / "pricing").mkdir(exist_ok=True)
     (SITE / "security").mkdir(exist_ok=True)
+    (SITE / "docs/detection").mkdir(parents=True, exist_ok=True)
     (SITE / "index.html").write_text(home())
     (SITE / "pricing/index.html").write_text(pricing())
     (SITE / "security/index.html").write_text(security())
+    (SITE / "docs/index.html").write_text(docs())
+    (SITE / "docs/detection/index.html").write_text(detection())
     (SITE / "404.html").write_text(not_found())
     (SITE / "favicon.svg").write_text(FAVICON)
     (SITE / "site.js").write_text(SITE_JS)
