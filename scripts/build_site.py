@@ -10,9 +10,12 @@ Plan names and prices mirror neurawall/modules/billing/plans.py; keep them in st
 
 from __future__ import annotations
 
+import html
+import re
 from pathlib import Path
 
-SITE = Path(__file__).resolve().parent.parent / "neurawall/services/control_plane/site"
+ROOT = Path(__file__).resolve().parent.parent
+SITE = ROOT / "neurawall/services/control_plane/site"
 DOCS = "https://docs.onenexora.com"
 NEXORA = "https://onenexora.com"
 VIGILO = "https://vigilo.onenexora.com"
@@ -35,6 +38,93 @@ ICONS = {
     "layers": '<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/>',
     "refresh": '<path d="M20 11a8 8 0 00-14-4L4 9"/><path d="M4 4v5h5"/><path d="M4 13a8 8 0 0014 4l2-2"/><path d="M20 20v-5h-5"/>',
 }
+
+
+# ---------------------------------------------------------------- markdown (just what our docs use)
+_BOLD = re.compile(r"\*\*(.+?)\*\*")
+_ITALIC = re.compile(r"(?<![\w*])\*([^*\s][^*]*?)\*(?![\w*])")
+_LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+
+
+def _inline(text: str) -> str:
+    """Code spans, bold and links; everything else is escaped."""
+    out: list[str] = []
+    pos = 0
+    for m in re.finditer(r"(`+)(.+?)\1", text):
+        out.append(_inline_plain(text[pos : m.start()]))
+        out.append(f"<code>{html.escape(m.group(2).strip())}</code>")
+        pos = m.end()
+    out.append(_inline_plain(text[pos:]))
+    return "".join(out)
+
+
+def _inline_plain(text: str) -> str:
+    text = html.escape(text, quote=False)
+    text = _BOLD.sub(r"<strong>\1</strong>", text)
+    text = _ITALIC.sub(r"<em>\1</em>", text)
+    return _LINK.sub(r'<a href="\2">\1</a>', text)
+
+
+def _cell(text: str) -> str:
+    text = text.strip().replace("\\|", "|")
+    if len(text) > 2 and text.startswith("`") and text.endswith("`"):
+        return f"<code>{html.escape(text[1:-1])}</code>"  # a whole-cell payload may hold backticks
+    return _inline(text)
+
+
+def _split_row(line: str) -> list[str]:
+    cells = re.split(r"(?<!\\)\|", line.strip())
+    return cells[1:-1]
+
+
+def markdown_body(source: str) -> tuple[str, str]:
+    """(title, html) for a small markdown subset: #/## headings, paragraphs, bullets, tables."""
+    title, out = "", []
+    lines = source.split("\n")
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if not line.strip():
+            i += 1
+        elif line.startswith("# "):
+            title = line[2:].strip()
+            i += 1
+        elif line.startswith("## "):
+            out.append(f"<h2>{_inline(line[3:].strip())}</h2>")
+            i += 1
+        elif line.startswith("|"):
+            rows = []
+            while i < len(lines) and lines[i].startswith("|"):
+                rows.append(lines[i])
+                i += 1
+            head, body = _split_row(rows[0]), [_split_row(r) for r in rows[2:]]
+            th = "".join(f"<th>{_inline(c.strip())}</th>" for c in head)
+            tr = "".join(
+                "<tr>" + "".join(f"<td>{_cell(c)}</td>" for c in r) + "</tr>" for r in body
+            )
+            out.append(
+                f'<div class="scroll"><table class="compare"><thead><tr>{th}</tr></thead><tbody>{tr}</tbody></table></div>'
+            )
+        elif line.startswith("- "):
+            items = []
+            while (
+                i < len(lines)
+                and (lines[i].startswith("- ") or lines[i].startswith("  "))
+                and lines[i].strip()
+            ):
+                if lines[i].startswith("- "):
+                    items.append(lines[i][2:].strip())
+                else:
+                    items[-1] += " " + lines[i].strip()
+                i += 1
+            out.append("<ul>" + "".join(f"<li>{_inline(t)}</li>" for t in items) + "</ul>")
+        else:
+            para = []
+            while i < len(lines) and lines[i].strip() and not lines[i].startswith(("#", "|", "- ")):
+                para.append(lines[i].strip())
+                i += 1
+            out.append(f"<p>{_inline(' '.join(para))}</p>")
+    return title, "\n".join(out)
 
 
 def icon(name: str) -> str:
@@ -358,6 +448,7 @@ def docs() -> str:
   <div class="grid">
     {card("Three tiers, one decision", "Tier 1 scores flow behaviour, Tier 2 classifies traffic, Tier 3 (Claude, or an offline advisor) drafts rules. None of them can block. Only the policy engine decides, and every drop maps to a rule id.")}
     {card("What it sees without decrypting", "Flow shape, timing, TLS handshake fields and DNS names. NeuraWall never intercepts TLS and never stores payloads.", "/docs/detection/")}
+    {card("Published evasion report", "What the injection detector catches and misses against well-known evasion techniques, case by case. A measurement of one detector, not a detection rate.", "/docs/evasion-report/")}
     {card("Signed bundles", "Every rule change produces an Ed25519-signed bundle. Nodes verify it themselves, refuse older versions and keep the last known good one if the control plane is unreachable.")}
     {card("Safe change management", "Each draft is replayed against recent legitimate traffic. A staged rollout (5%, 25%, all) rolls back automatically if blocking jumps. Optional four-eyes approval.")}
     {card("Audit trail", "A hash-chained record of every change, approval and sign-in that you can verify from the console. It records opaque user ids, never email addresses.")}
@@ -427,7 +518,7 @@ def detection() -> str:
 
   <h2>The honest limit</h2>
   <p>On a public HTTPS service the injection detector sees nothing unless the sensor sits behind the TLS terminator, or you already run sensor-side decryption. Tier 1 and the signals in the first table work either way.</p>
-  <p>The detectors are heuristics with known gaps. A detector can only raise an alert; a person approves any rule that blocks.</p>
+  <p>The detectors are heuristics with known gaps, and we publish them: see the <a href="/docs/evasion-report/">Tier 2 evasion report</a>. A detector can only raise an alert; a person approves any rule that blocks.</p>
   <p><a class="btn line" href="/docs/">Back to documentation</a></p>
 </div></section>
 """
@@ -435,6 +526,25 @@ def detection() -> str:
         title="What NeuraWall detects without decrypting · NeuraWall docs",
         description="Which signals NeuraWall uses on encrypted traffic, what needs the request visible, and the honest limits.",
         path="/docs/detection/",
+        current="docs",
+        body=body,
+    )
+
+
+def evasion_report() -> str:
+    title, content = markdown_body((ROOT / "docs/evasion-report.md").read_text())
+    body = f"""
+<section class="doc"><div class="wrap">
+  <p class="eyebrow"><a href="/docs/">Documentation</a> · <a href="/docs/detection/">Detection</a></p>
+  <h1>{html.escape(title)}</h1>
+{content}
+  <p><a class="btn line" href="/docs/detection/">Back to what NeuraWall detects</a></p>
+</div></section>
+"""
+    return page(
+        title="Tier 2 evasion report · NeuraWall docs",
+        description="What NeuraWall's injection detector catches and misses against known evasion techniques, measured and published.",
+        path="/docs/evasion-report/",
         current="docs",
         body=body,
     )
@@ -481,11 +591,13 @@ def main() -> None:
     (SITE / "pricing").mkdir(exist_ok=True)
     (SITE / "security").mkdir(exist_ok=True)
     (SITE / "docs/detection").mkdir(parents=True, exist_ok=True)
+    (SITE / "docs/evasion-report").mkdir(parents=True, exist_ok=True)
     (SITE / "index.html").write_text(home())
     (SITE / "pricing/index.html").write_text(pricing())
     (SITE / "security/index.html").write_text(security())
     (SITE / "docs/index.html").write_text(docs())
     (SITE / "docs/detection/index.html").write_text(detection())
+    (SITE / "docs/evasion-report/index.html").write_text(evasion_report())
     (SITE / "404.html").write_text(not_found())
     (SITE / "favicon.svg").write_text(FAVICON)
     (SITE / "site.js").write_text(SITE_JS)

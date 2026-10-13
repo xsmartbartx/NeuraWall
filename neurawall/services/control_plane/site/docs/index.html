@@ -65,6 +65,7 @@
   <div class="grid">
     <div class="tile"><h3>Three tiers, one decision</h3><p>Tier 1 scores flow behaviour, Tier 2 classifies traffic, Tier 3 (Claude, or an offline advisor) drafts rules. None of them can block. Only the policy engine decides, and every drop maps to a rule id.</p></div>
     <div class="tile"><h3><a href="/docs/detection/">What it sees without decrypting</a></h3><p>Flow shape, timing, TLS handshake fields and DNS names. NeuraWall never intercepts TLS and never stores payloads.</p></div>
+    <div class="tile"><h3><a href="/docs/evasion-report/">Published evasion report</a></h3><p>What the injection detector catches and misses against well-known evasion techniques, case by case. A measurement of one detector, not a detection rate.</p></div>
     <div class="tile"><h3>Signed bundles</h3><p>Every rule change produces an Ed25519-signed bundle. Nodes verify it themselves, refuse older versions and keep the last known good one if the control plane is unreachable.</p></div>
     <div class="tile"><h3>Safe change management</h3><p>Each draft is replayed against recent legitimate traffic. A staged rollout (5%, 25%, all) rolls back automatically if blocking jumps. Optional four-eyes approval.</p></div>
     <div class="tile"><h3>Audit trail</h3><p>A hash-chained record of every change, approval and sign-in that you can verify from the console. It records opaque user ids, never email addresses.</p></div>

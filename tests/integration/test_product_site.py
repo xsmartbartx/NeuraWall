@@ -18,6 +18,7 @@ def test_site_pages_and_assets(env):
         "/security/",
         "/docs/",
         "/docs/detection/",
+        "/docs/evasion-report/",
         "/site.css",
         "/site.js",
         "/favicon.svg",

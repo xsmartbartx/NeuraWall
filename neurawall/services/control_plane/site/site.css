@@ -138,6 +138,10 @@ table.compare th, table.compare td { text-align: left; padding: 14px 18px; borde
 table.compare th { font-weight: 600; background: var(--bg-alt); }
 table.compare tr:last-child td { border-bottom: 0; }
 .scroll { overflow-x: auto; }
+table.compare td code { overflow-wrap: anywhere; font-size: 12.5px; }
+.doc table.compare { font-size: 14px; }
+.doc table.compare th, .doc table.compare td { padding: 10px 12px; }
+.doc .scroll { margin: 8px 0 24px; }
 .note { color: var(--muted); font-size: 14px; margin-top: 18px; }
 
 /* ---- faq ---- */
