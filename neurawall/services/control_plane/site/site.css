@@ -112,7 +112,8 @@ section.dark .tile .ico { background: #11261d; color: var(--glow); }
 .panel .row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--dark-line); }
 .panel .row:last-child { border: 0; }
 .panel .row span { overflow-wrap: anywhere; min-width: 0; }
-.panel .k { color: var(--dark-muted); }
+.panel .k { color: var(--dark-muted); white-space: nowrap; }
+.panel .row { flex-wrap: wrap; }
 .panel .ok { color: var(--glow); }
 .panel .warn { color: #f0b429; }
 .panel .head { font-family: var(--sans); font-weight: 650; font-size: 15px; margin-bottom: 6px; }
@@ -139,7 +140,7 @@ table.compare th { font-weight: 600; background: var(--bg-alt); }
 table.compare tr:last-child td { border-bottom: 0; }
 .scroll { overflow-x: auto; }
 table.compare td code { overflow-wrap: anywhere; font-size: 12.5px; }
-.doc table.compare { font-size: 14px; }
+.doc table.compare { font-size: 14px; min-width: 640px; }
 .doc table.compare th, .doc table.compare td { padding: 10px 12px; }
 .doc .scroll { margin: 8px 0 24px; }
 .note { color: var(--muted); font-size: 14px; margin-top: 18px; }
