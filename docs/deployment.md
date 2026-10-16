@@ -120,6 +120,23 @@ handles rotation and never reads payloads.
 Other sensors can write NeuraWall `FlowRecord` JSON lines to a file (`source: jsonl`) or POST
 batches directly to `/api/v1/agent/flows` with a node API key.
 
+## Public demo instance
+
+A "Try the demo" guest login for prospects must run on its **own** instance with synthetic traffic.
+The server refuses to start one that is linked to NEXORA, has Stripe keys or has a Claude key
+(`auth.demo_public_login` needs `demo_mode` and the offline advisor), so a guest can never see real data.
+
+On the NEXORA host the demo is the `demo` profile in `deploy/compose/nexora-host.yml`:
+
+1. Point a hostname (for example `neurawall-demo.onenexora.com`) at the host in DNS.
+2. In `/opt/neurawall/.env` set `NEURAWALL_DEMO_DOMAIN` and a **separate** `NEURAWALL_DEMO_SECRET_KEY`.
+3. Add the hostname to the edge Caddyfile (`reverse_proxy neurawall-demo-1:8080`) and reload the edge.
+4. `deploy.sh neurawall demo`.
+
+The guest account is a read-only viewer with a 30-minute session, rate-limited per address
+(`login_demo` in the control plane). The demo has its own data volume (`demodata`), so it can be
+wiped without touching the real instance.
+
 ## Enabling enforcement safely
 
 1. Run nodes with `backend: dry-run` and let Tier 1 warm up (default 200 flows; watch
