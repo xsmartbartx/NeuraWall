@@ -109,8 +109,31 @@ services:
     healthcheck:
       disable: true             # the image's check probes the control plane's :8080
 
+  # --- Public demo (profile "demo"): a SEPARATE instance with synthetic traffic and a read-only
+  # guest login ("Try the demo"). It has its own data volume, no Postgres, no NEXORA link, no
+  # Stripe keys and no Claude key: the server refuses to start a public demo with any of those.
+  #   deploy.sh neurawall demo
+  # The edge Caddy proxies the demo hostname -> neurawall-demo-1:8080 (see the NEXORA edge Caddyfile).
+  demo:
+    profiles: ["demo"]
+    build:
+      context: ../..
+    image: neurawall:host
+    restart: unless-stopped
+    environment:
+      NEURAWALL_ENVIRONMENT: production
+      NEURAWALL_PUBLIC_URL: https://${NEURAWALL_DEMO_DOMAIN:?set NEURAWALL_DEMO_DOMAIN in /opt/neurawall/.env}
+      NEURAWALL_AUTH__SECRET_KEY: ${NEURAWALL_DEMO_SECRET_KEY:?set NEURAWALL_DEMO_SECRET_KEY in /opt/neurawall/.env}
+      NEURAWALL_DEMO_MODE: "true"
+      NEURAWALL_AUTH__DEMO_PUBLIC_LOGIN: "true"
+      FORWARDED_ALLOW_IPS: "*"   # only reachable through the edge Caddy on this network
+    volumes:
+      - demodata:/data
+    mem_limit: 1g
+
 volumes:
   pgdata:
   cpdata:
+  demodata:
   zeeklogs:
   agentstate:
