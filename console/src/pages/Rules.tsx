@@ -3,6 +3,7 @@ import { Async, Badge, Card, Drawer, Modal, PageHead, activatable } from "../com
 import { api, type HygieneFinding, type Rule, type RuleStats, type Simulation } from "../lib/api";
 import { ago, dateTime, human, matchSummary } from "../lib/format";
 import { SimulationView } from "./Approvals";
+import { ChangeWindows } from "./ChangeWindows";
 import { useAction, useApi, useAuth } from "../lib/hooks";
 
 export function Rules() {
@@ -124,6 +125,7 @@ export function Rules() {
           <p style={{ margin: 0 }}>“{deleting.name}” will be removed and a new bundle published to the fleet. The deletion is recorded in the audit trail; rolling back the bundle restores it.</p>
         </Modal>
       )}
+      <ChangeWindows />
     </>
   );
 }

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import queue
 import random
 import secrets
@@ -48,6 +49,7 @@ from neurawall.core.models import (
 )
 from neurawall.core.telemetry import REGISTRY
 from neurawall.modules.anomaly_engine import AnomalyEngine
+from neurawall.modules.anomaly_engine.engine import Suppression
 from neurawall.modules.billing import (
     PLANS,
     NotOurEvent,
@@ -165,6 +167,7 @@ class ControlPlane:
         self._threads: list[threading.Thread] = []
         self.started_at = time.time()
         self._bootstrap()
+        self._load_change_windows()
 
     # ------------------------------------------------------------------ setup
 
@@ -2343,6 +2346,112 @@ class ControlPlane:
                     a = s.get(db.Alert, alert_id)
                     if a is not None:
                         a.tier3_pending = False
+
+    # ------------------------------------------------------------------ change windows
+
+    #: A change window may not exceed this, nor cover more than a /16 (IPv4) or /48 (IPv6):
+    #: it must not become a way to switch detection off across the network.
+    CHANGE_WINDOW_MAX_SECONDS = 24 * 3600
+    CHANGE_WINDOW_MIN_PREFIX = {4: 16, 6: 48}
+
+    def _load_change_windows(self) -> None:
+        now = time.time()
+        with self.db.session() as s:
+            rows = s.scalars(
+                select(db.ChangeWindow).where(
+                    db.ChangeWindow.cancelled_at.is_(None), db.ChangeWindow.ends_at > now
+                )
+            ).all()
+            windows = [Suppression(list(r.cidrs), r.ends_at, r.reason, r.starts_at) for r in rows]
+        self.anomaly.set_suppressions(windows)
+
+    @staticmethod
+    def _change_window_dict(r: db.ChangeWindow, now: float) -> dict[str, Any]:
+        if r.cancelled_at is not None:
+            status = "cancelled"
+        elif r.ends_at <= now:
+            status = "ended"
+        elif r.starts_at > now:
+            status = "scheduled"
+        else:
+            status = "active"
+        return {
+            "id": r.id,
+            "cidrs": list(r.cidrs),
+            "starts_at": r.starts_at,
+            "ends_at": r.ends_at,
+            "reason": r.reason,
+            "created_by": r.created_by,
+            "created_at": r.created_at,
+            "cancelled_at": r.cancelled_at,
+            "status": status,
+        }
+
+    def list_change_windows(self, *, include_past: bool = False) -> list[dict[str, Any]]:
+        now = time.time()
+        with self.db.session() as s:
+            q = select(db.ChangeWindow).order_by(db.ChangeWindow.starts_at.desc()).limit(200)
+            if not include_past:
+                q = q.where(db.ChangeWindow.cancelled_at.is_(None), db.ChangeWindow.ends_at > now)
+            return [self._change_window_dict(r, now) for r in s.scalars(q)]
+
+    def create_change_window(
+        self, actor: str, *, cidrs: list[str], starts_at: float, ends_at: float, reason: str
+    ) -> dict[str, Any]:
+        now = time.time()
+        if not cidrs or len(cidrs) > 32:
+            raise ValidationFailure("a change window needs between 1 and 32 networks")
+        nets: list[str] = []
+        for c in cidrs:
+            try:
+                net = ipaddress.ip_network(c.strip(), strict=False)
+            except ValueError as exc:
+                raise ValidationFailure(f"not a valid network: {c[:60]!r}") from exc
+            if net.prefixlen < self.CHANGE_WINDOW_MIN_PREFIX[net.version]:
+                limit = self.CHANGE_WINDOW_MIN_PREFIX[net.version]
+                raise ValidationFailure(f"{net} is too broad; use /{limit} or narrower")
+            nets.append(str(net))
+        if ends_at <= starts_at:
+            raise ValidationFailure("the window must end after it starts")
+        if ends_at <= now:
+            raise ValidationFailure("the window is already over")
+        if ends_at - starts_at > self.CHANGE_WINDOW_MAX_SECONDS:
+            raise ValidationFailure("a change window may last at most 24 hours")
+        if starts_at > now + 30 * 86400:
+            raise ValidationFailure("a change window must start within 30 days")
+        reason = reason.strip()
+        if not reason:
+            raise ValidationFailure("a reason is required")
+        with self.db.session() as s:
+            row = db.ChangeWindow(
+                cidrs=nets,
+                starts_at=max(starts_at, now - 60),
+                ends_at=ends_at,
+                reason=reason[:300],
+                created_by=actor,
+            )
+            s.add(row)
+            s.flush()
+            out = self._change_window_dict(row, now)
+        self.audit(
+            actor,
+            "change_window.create",
+            f"change_window:{out['id']}",
+            {"cidrs": nets, "starts_at": out["starts_at"], "ends_at": ends_at, "reason": reason},
+        )
+        self._load_change_windows()
+        return out
+
+    def cancel_change_window(self, actor: str, window_id: int) -> None:
+        with self.db.session() as s:
+            row = s.get(db.ChangeWindow, window_id)
+            if row is None:
+                raise NotFound("change window not found")
+            if row.cancelled_at is not None:
+                raise PolicyViolation("change window is already cancelled")
+            row.cancelled_at = time.time()
+        self.audit(actor, "change_window.cancel", f"change_window:{window_id}")
+        self._load_change_windows()
 
     def run_maintenance(self) -> None:
         now = time.time()

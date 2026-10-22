@@ -77,6 +77,7 @@ class Suppression:
     cidrs: list[str]
     until: float
     reason: str
+    starts: float = 0.0
 
 
 class AnomalyEngine:
@@ -120,6 +121,10 @@ class AnomalyEngine:
 
     def suppress(self, cidrs: list[str], seconds: float, reason: str) -> None:
         self._suppressions.append(Suppression(cidrs, time.time() + seconds, reason))
+
+    def set_suppressions(self, windows: list[Suppression]) -> None:
+        """Replace all change windows (the control plane owns and persists them)."""
+        self._suppressions = list(windows)
 
     def score(self, flow: FlowRecord) -> AnomalyScore:
         return self.score_batch([flow])[0]
@@ -259,4 +264,4 @@ class AnomalyEngine:
     def _is_suppressed(self, ip: str) -> bool:
         now = time.time()
         self._suppressions = [s for s in self._suppressions if s.until > now]
-        return any(ip_in_any(ip, s.cidrs) for s in self._suppressions)
+        return any(s.starts <= now and ip_in_any(ip, s.cidrs) for s in self._suppressions)

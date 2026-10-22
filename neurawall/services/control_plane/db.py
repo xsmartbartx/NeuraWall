@@ -343,3 +343,18 @@ class NotificationDelivery(Base):
     error: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[float] = mapped_column(Float, default=_now)
     sent_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class ChangeWindow(Base):
+    """A planned change (deployment, backup, migration) during which Tier 1 anomaly scores
+    for the listed networks are damped. Labels and rules still apply."""
+
+    __tablename__ = "change_windows"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cidrs: Mapped[list[str]] = mapped_column(JSON)
+    starts_at: Mapped[float] = mapped_column(Float, index=True)
+    ends_at: Mapped[float] = mapped_column(Float, index=True)
+    reason: Mapped[str] = mapped_column(String(300))
+    created_by: Mapped[str] = mapped_column(String(254))
+    created_at: Mapped[float] = mapped_column(Float, default=_now)
+    cancelled_at: Mapped[float | None] = mapped_column(Float, nullable=True)
