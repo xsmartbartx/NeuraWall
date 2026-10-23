@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Change windows: schedule a planned change (deployment, backup, migration) for up to 24 hours
+  on specific hosts or networks (no broader than /16 or /48), and Tier 1 anomaly scores for them
+  are damped so it does not page anyone; labels and rules still apply. Persisted, audited,
+  cancellable. Rules page panel and `GET/POST /change-windows`, `DELETE /change-windows/{id}`.
 - Rules page: how many flows each rule matched in the last 7 days and when it last did ("never" makes dead rules visible),
   and a "Replay against recent traffic" card in the rule drawer showing its blast radius. New `GET /rules/stats` and
   `GET /rules/{id}/impact`.

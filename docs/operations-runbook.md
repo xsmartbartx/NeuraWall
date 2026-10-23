@@ -61,9 +61,13 @@ Automatic rollback also triggers during canary stages when canary nodes block �
 points more traffic than the rest (`policy.rollback_block_rate_increase`).
 
 **A host is noisy during a planned change (deployment, backup window).**
-Create an `allow` rule scoped to the host, with a lower priority number than the rules it
-should override, and disable it after the window. (Tier 1 change-window suppression exists in the
-engine API, `AnomalyEngine.suppress`, but is not yet exposed in the console.)
+Rules → **Change windows → New window**: list the hosts or networks (nothing broader than a
+/16 or /48), a start time and a duration (at most 24 hours), and the reason. While the window is
+active, Tier 1 anomaly scores for those networks are damped so the change does not raise alerts.
+Tier 2 labels and rules still apply, so a real attack during the window is still caught. Windows
+survive restarts, can be cancelled early, and are recorded in the audit trail
+(`change_window.create` / `change_window.cancel`). To silence a *rule* during the change instead,
+disable the rule and re-enable it afterwards.
 
 **Tier 3 shows *degraded*.**
 Settings → Tier 3 advisor shows the last error. Typical causes: invalid or rotated API key,

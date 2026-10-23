@@ -922,6 +922,40 @@ class ChannelPatch(Body):
     rotate_secret: bool = False
 
 
+# ---------------------------------------------------------------- change windows
+
+
+class ChangeWindowIn(Body):
+    cidrs: Annotated[list[Annotated[str, Field(max_length=50)]], Field(min_length=1, max_length=32)]
+    #: Unix time; omitted = now.
+    starts_at: Annotated[float, Field(allow_inf_nan=False)] | None = None
+    duration_minutes: Annotated[int, Field(ge=1, le=24 * 60)]
+    reason: Annotated[str, Field(min_length=1, max_length=300)]
+
+
+@api.get("/change-windows", tags=["rules"])
+def list_change_windows(cp: CP, _: Reader, include_past: bool = False) -> list[dict[str, Any]]:
+    """Planned changes during which Tier 1 anomaly scores for the listed networks are damped."""
+    return cp.list_change_windows(include_past=include_past)
+
+
+@api.post("/change-windows", tags=["rules"], status_code=201)
+def create_change_window(body: ChangeWindowIn, cp: CP, actor: Author) -> dict[str, Any]:
+    starts = body.starts_at if body.starts_at is not None else time.time()
+    return cp.create_change_window(
+        actor.email,
+        cidrs=body.cidrs,
+        starts_at=starts,
+        ends_at=starts + body.duration_minutes * 60,
+        reason=body.reason,
+    )
+
+
+@api.delete("/change-windows/{window_id}", tags=["rules"], status_code=204)
+def cancel_change_window(window_id: int, cp: CP, actor: Author) -> None:
+    cp.cancel_change_window(actor.email, window_id)
+
+
 @api.get("/notifications/channels", tags=["notifications"])
 def list_channels(cp: CP, _: Integrator) -> list[dict[str, Any]]:
     return cp.list_channels()
