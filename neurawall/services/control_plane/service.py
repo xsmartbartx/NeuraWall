@@ -161,6 +161,9 @@ class ControlPlane:
         self._nexora_transport: httpx.BaseTransport | None = None  # tests inject a fake NEXORA
         self._audit_lock = threading.Lock()
         self._publish_lock = threading.Lock()
+        #: Serialises change-window reloads from DB read to engine update, so a slower reload
+        #: cannot install a stale snapshot over a newer one (e.g. reviving a cancelled window).
+        self._change_windows_lock = threading.Lock()
         self._ingest_lock = threading.Lock()
         self._tier3: queue.Queue[int] = queue.Queue(maxsize=500)
         self._stop = threading.Event()
@@ -2356,15 +2359,18 @@ class ControlPlane:
     CHANGE_WINDOW_MIN_PREFIX = {4: 16, 6: 48}
 
     def _load_change_windows(self) -> None:
-        now = time.time()
-        with self.db.session() as s:
-            rows = s.scalars(
-                select(db.ChangeWindow).where(
-                    db.ChangeWindow.cancelled_at.is_(None), db.ChangeWindow.ends_at > now
-                )
-            ).all()
-            windows = [Suppression(list(r.cidrs), r.ends_at, r.reason, r.starts_at) for r in rows]
-        self.anomaly.set_suppressions(windows)
+        with self._change_windows_lock:
+            now = time.time()
+            with self.db.session() as s:
+                rows = s.scalars(
+                    select(db.ChangeWindow).where(
+                        db.ChangeWindow.cancelled_at.is_(None), db.ChangeWindow.ends_at > now
+                    )
+                ).all()
+                windows = [
+                    Suppression(list(r.cidrs), r.ends_at, r.reason, r.starts_at) for r in rows
+                ]
+            self.anomaly.set_suppressions(windows)
 
     @staticmethod
     def _change_window_dict(r: db.ChangeWindow, now: float) -> dict[str, Any]:

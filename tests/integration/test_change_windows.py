@@ -160,3 +160,40 @@ def test_api_rejects_non_finite_start(client):  # noqa: F811
         content=b'{"cidrs": ["10.30.0.0/24"], "duration_minutes": 30, "reason": "x", "starts_at": NaN}',
     )
     assert r.status_code == 422
+
+
+def test_concurrent_reloads_cannot_revive_a_cancelled_window(cp):  # noqa: F811
+    """A create whose reload is slow must not overwrite a later cancel's reload."""
+    import threading
+
+    now = time.time()
+    old = cp.create_change_window(
+        "op", cidrs=["10.20.0.1"], starts_at=now, ends_at=now + 600, reason="old"
+    )
+    real_set = cp.anomaly.set_suppressions
+    paused, go = threading.Event(), threading.Event()
+    calls = {"n": 0}
+
+    def slow_first_set(windows):
+        calls["n"] += 1
+        if calls["n"] == 1:  # the create's reload: hold its (soon stale) snapshot
+            paused.set()
+            go.wait(5)
+        real_set(windows)
+
+    cp.anomaly.set_suppressions = slow_first_set
+    creator = threading.Thread(
+        target=cp.create_change_window,
+        args=("op",),
+        kwargs={"cidrs": ["10.20.0.2"], "starts_at": now, "ends_at": now + 600, "reason": "new"},
+    )
+    creator.start()
+    assert paused.wait(5)
+    canceller = threading.Thread(target=cp.cancel_change_window, args=("op", old["id"]))
+    canceller.start()
+    time.sleep(0.3)  # without the lock the cancel's reload finishes here, before the stale set
+    go.set()
+    creator.join(5)
+    canceller.join(5)
+    active = [c for w in cp.anomaly._suppressions for c in w.cidrs]
+    assert active == ["10.20.0.2/32"]
