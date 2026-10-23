@@ -928,7 +928,7 @@ class ChannelPatch(Body):
 class ChangeWindowIn(Body):
     cidrs: Annotated[list[Annotated[str, Field(max_length=50)]], Field(min_length=1, max_length=32)]
     #: Unix time; omitted = now.
-    starts_at: float | None = None
+    starts_at: Annotated[float, Field(allow_inf_nan=False)] | None = None
     duration_minutes: Annotated[int, Field(ge=1, le=24 * 60)]
     reason: Annotated[str, Field(min_length=1, max_length=300)]
 

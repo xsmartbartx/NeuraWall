@@ -82,7 +82,8 @@ export function ChangeWindows() {
         </>}>
           <label className="field">Networks (IPs or CIDRs, comma-separated)<input value={form.cidrs} placeholder="10.30.0.0/24, 10.20.0.15" onChange={(e) => setForm({ ...form, cidrs: e.target.value })} /></label>
           <label className="field">Start (leave empty for now)<input type="datetime-local" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></label>
-          <label className="field">Duration
+          <label className="field">
+            Duration
             <select value={form.minutes} onChange={(e) => setForm({ ...form, minutes: e.target.value })}>
               {[["30", "30 minutes"], ["60", "1 hour"], ["120", "2 hours"], ["240", "4 hours"], ["480", "8 hours"], ["1440", "24 hours"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>

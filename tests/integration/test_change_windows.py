@@ -47,11 +47,13 @@ def test_service_guards_and_lifecycle(cp):  # noqa: F811
     w = cp.create_change_window(
         "op", cidrs=["10.20.0.5"], starts_at=now, ends_at=now + 600, reason="deploy v2"
     )
-    assert w["status"] == "active" and w["cidrs"] == ["10.20.0.5/32"]
+    assert w["status"] == "active"
+    assert w["cidrs"] == ["10.20.0.5/32"]
     assert [x["id"] for x in cp.list_change_windows()] == [w["id"]]
     assert len(cp.anomaly._suppressions) == 1
     cp.cancel_change_window("op", w["id"])
-    assert cp.list_change_windows() == [] and cp.anomaly._suppressions == []
+    assert cp.list_change_windows() == []
+    assert cp.anomaly._suppressions == []
     assert cp.list_change_windows(include_past=True)[0]["status"] == "cancelled"
     with pytest.raises(PolicyViolation):
         cp.cancel_change_window("op", w["id"])
@@ -117,4 +119,44 @@ def test_api_and_rbac(client):  # noqa: F811
     assert client.delete(f"/api/v1/change-windows/{wid}", headers=vh).status_code == 403
     assert client.delete(f"/api/v1/change-windows/{wid}", headers=h).status_code == 204
     actions = [a["action"] for a in client.get("/api/v1/audit", headers=h).json()["items"]]
-    assert "change_window.create" in actions and "change_window.cancel" in actions
+    assert "change_window.create" in actions
+    assert "change_window.cancel" in actions
+
+
+def test_cancel_reaches_engine_even_if_audit_fails(cp, monkeypatch):  # noqa: F811
+    now = time.time()
+    w = cp.create_change_window(
+        "op", cidrs=["10.20.0.9"], starts_at=now, ends_at=now + 600, reason="deploy"
+    )
+
+    def boom(*a, **k):
+        raise RuntimeError("audit store down")
+
+    monkeypatch.setattr(cp, "audit", boom)
+    with pytest.raises(RuntimeError):
+        cp.cancel_change_window("op", w["id"])
+    assert cp.anomaly._suppressions == []
+
+
+def test_erasing_a_user_removes_their_email_from_change_windows(cp):  # noqa: F811
+    from neurawall.security.rbac import Role
+
+    u = cp.create_user(
+        "admin", email="ops@corp.io", name="Ops", role=Role.OPERATOR, password="Operator-Pass-12"
+    )
+    now = time.time()
+    cp.create_change_window(
+        u.email, cidrs=["10.20.0.9"], starts_at=now, ends_at=now + 600, reason="deploy"
+    )
+    cp.erase_user("admin", u.id)
+    assert all(w["created_by"] != "ops@corp.io" for w in cp.list_change_windows(include_past=True))
+
+
+def test_api_rejects_non_finite_start(client):  # noqa: F811
+    h = login(client)
+    r = client.post(
+        "/api/v1/change-windows",
+        headers={**h, "content-type": "application/json"},
+        content=b'{"cidrs": ["10.30.0.0/24"], "duration_minutes": 30, "reason": "x", "starts_at": NaN}',
+    )
+    assert r.status_code == 422

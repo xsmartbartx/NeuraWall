@@ -120,11 +120,16 @@ class AnomalyEngine:
         return self._forest is not None
 
     def suppress(self, cidrs: list[str], seconds: float, reason: str) -> None:
-        self._suppressions.append(Suppression(cidrs, time.time() + seconds, reason))
+        with self._lock:
+            self._suppressions.append(Suppression(cidrs, time.time() + seconds, reason))
 
     def set_suppressions(self, windows: list[Suppression]) -> None:
-        """Replace all change windows (the control plane owns and persists them)."""
-        self._suppressions = list(windows)
+        """Replace all change windows (the control plane owns and persists them).
+
+        Takes the scoring lock: `_is_suppressed` prunes and reassigns the list while scoring,
+        and an unlocked swap could be overwritten, reviving a cancelled window."""
+        with self._lock:
+            self._suppressions = list(windows)
 
     def score(self, flow: FlowRecord) -> AnomalyScore:
         return self.score_batch([flow])[0]

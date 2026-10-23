@@ -526,6 +526,7 @@ class ControlPlane:
                 (db.EnrollmentToken, "created_by"),
                 (db.NotificationChannel, "created_by"),
                 (db.Alert, "assignee"),
+                (db.ChangeWindow, "created_by"),
             ):
                 col = getattr(model, column)
                 s.execute(update(model).where(col == old).values({column: placeholder}))
@@ -2433,13 +2434,21 @@ class ControlPlane:
             s.add(row)
             s.flush()
             out = self._change_window_dict(row, now)
-        self.audit(
-            actor,
-            "change_window.create",
-            f"change_window:{out['id']}",
-            {"cidrs": nets, "starts_at": out["starts_at"], "ends_at": ends_at, "reason": reason},
-        )
-        self._load_change_windows()
+        # The row is committed: the engine must follow the database even if auditing fails.
+        try:
+            self.audit(
+                actor,
+                "change_window.create",
+                f"change_window:{out['id']}",
+                {
+                    "cidrs": nets,
+                    "starts_at": out["starts_at"],
+                    "ends_at": ends_at,
+                    "reason": reason,
+                },
+            )
+        finally:
+            self._load_change_windows()
         return out
 
     def cancel_change_window(self, actor: str, window_id: int) -> None:
@@ -2450,8 +2459,10 @@ class ControlPlane:
             if row.cancelled_at is not None:
                 raise PolicyViolation("change window is already cancelled")
             row.cancelled_at = time.time()
-        self.audit(actor, "change_window.cancel", f"change_window:{window_id}")
-        self._load_change_windows()
+        try:
+            self.audit(actor, "change_window.cancel", f"change_window:{window_id}")
+        finally:
+            self._load_change_windows()
 
     def run_maintenance(self) -> None:
         now = time.time()
