@@ -126,6 +126,10 @@ services:
       NEURAWALL_AUTH__SECRET_KEY: ${NEURAWALL_DEMO_SECRET_KEY:?set NEURAWALL_DEMO_SECRET_KEY in /opt/neurawall/.env}
       NEURAWALL_DEMO_MODE: "true"
       NEURAWALL_AUTH__DEMO_PUBLIC_LOGIN: "true"
+      # A public demo runs for weeks: keep it small (about 3 flows a second, 6 hours of history).
+      # At the default rate it wrote ~4 GB a day to its SQLite file.
+      NEURAWALL_DEMO_FLOWS_PER_TICK: "6"
+      NEURAWALL_FLOW_RETENTION_SECONDS: "21600"
       FORWARDED_ALLOW_IPS: "*"   # only reachable through the edge Caddy on this network
     volumes:
       - demodata:/data

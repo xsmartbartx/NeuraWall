@@ -22,6 +22,7 @@ Configuration is layered: **defaults → YAML file → environment → runtime o
 | `log_level` | `NEURAWALL_LOG_LEVEL` | `DEBUG` / `INFO` / `WARNING` / `ERROR` | `INFO` | Log verbosity. |
 | `log_json` | `NEURAWALL_LOG_JSON` | bool | `True` | Structured JSON logs (recommended in production) instead of human-readable text. |
 | `demo_mode` | `NEURAWALL_DEMO_MODE` | bool | `False` | Generate synthetic traffic from a built-in demo sensor (for evaluation / sales demos). |
+| `demo_flows_per_tick` | `NEURAWALL_DEMO_FLOWS_PER_TICK` | int | `60` | Synthetic flows the demo sensor emits every 2 seconds. The default (60) is for a local trial; a long-running public demo should use a handful, or its database grows by gigabytes a day. |
 | `flow_retention_seconds` | `NEURAWALL_FLOW_RETENTION_SECONDS` | int \| None | — | Override flow retention. Unset = the active plan's retention (7/30/90 days). |
 
 ## `inference`

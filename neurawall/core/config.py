@@ -271,6 +271,9 @@ class Settings(BaseSettings):
     log_json: bool = True
     #: Generate synthetic traffic from a built-in demo sensor (for evaluation / sales demos).
     demo_mode: bool = False
+    #: Synthetic flows the demo sensor emits every 2 seconds. The default (60) is for a local trial;
+    #: a long-running public demo should use a handful, or its database grows by gigabytes a day.
+    demo_flows_per_tick: int = Field(60, ge=1, le=600)
     #: Override flow retention. Unset = the active plan's retention (7/30/90 days).
     flow_retention_seconds: int | None = Field(None, ge=3600)
 

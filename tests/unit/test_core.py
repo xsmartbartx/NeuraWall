@@ -136,3 +136,11 @@ def test_metrics_exposition():
     text = r.expose()
     assert 'flows_total{node="a"} 1.0' in text
     assert "lat_seconds_count 1" in text
+
+
+def test_demo_rate_is_bounded_and_defaults_to_the_trial_rate():
+    assert load_settings(environment="test").demo_flows_per_tick == 60
+    assert load_settings(environment="test", demo_flows_per_tick=6).demo_flows_per_tick == 6
+    for bad in (0, 601):
+        with pytest.raises(ValidationError):
+            load_settings(environment="test", demo_flows_per_tick=bad)
