@@ -19,6 +19,7 @@ SITE = ROOT / "neurawall/services/control_plane/site"
 DOCS = "https://docs.onenexora.com"
 NEXORA = "https://onenexora.com"
 VIGILO = "https://vigilo.onenexora.com"
+DEMO = "https://neurawall-demo.onenexora.com/app/"
 
 LOGO = (
     '<svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--card)" '
@@ -183,7 +184,7 @@ def page(*, title: str, description: str, path: str, current: str, body: str) ->
   <div class="cols">
     <div><a class="logo" href="/">{LOGO}NeuraWall</a><p>The AI-assisted firewall that never blocks on its own.<br>A <a href="{NEXORA}">NEXORA</a> product.</p></div>
     <div><h4>Product</h4><ul><li><a href="/#how">How it works</a></li><li><a href="/#features">Features</a></li><li><a href="/pricing/">Pricing</a></li><li><a href="/security/">Security</a></li></ul></div>
-    <div><h4>Resources</h4><ul><li><a href="/docs/">Documentation</a></li><li><a href="/api/docs">API reference</a></li><li><a href="https://status.onenexora.com">Status</a></li><li><a href="{NEXORA}/changelog">Changelog</a></li><li><a href="/app/">Open the console</a></li></ul></div>
+    <div><h4>Resources</h4><ul><li><a href="/docs/">Documentation</a></li><li><a href="/api/docs">API reference</a></li><li><a href="https://status.onenexora.com">Status</a></li><li><a href="{NEXORA}/changelog">Changelog</a></li><li><a href="{DEMO}">Try the demo</a></li><li><a href="/app/">Open the console</a></li></ul></div>
     <div><h4>NEXORA</h4><ul><li><a href="{NEXORA}">Platform</a></li><li><a href="{VIGILO}">Vigilo</a></li><li><a href="{NEXORA}/legal/privacy">Privacy</a></li><li><a href="{NEXORA}/legal/terms">Terms</a></li><li><a href="mailto:hello@onenexora.com">Contact</a></li></ul></div>
   </div>
   <div class="base"><span>© 2026 NEXORA. NeuraWall is proprietary software.</span><span>Prices in USD, billed in the NEXORA console.</span></div>
@@ -220,8 +221,8 @@ def home() -> str:
   <p class="eyebrow">NeuraWall · AI-assisted network security</p>
   <h1>A firewall that never blocks on its own.</h1>
   <p class="lede">Claude proposes the rule. You see what it would have blocked in your own traffic. A person approves it, and it rolls out in stages.</p>
-  <div class="actions"><a class="btn primary" href="/pricing/">Start free</a><a class="btn line" href="{DOCS}">Read the docs</a></div>
-  <p class="fine">Free for one node. Sign in with your NEXORA account.</p>
+  <div class="actions"><a class="btn primary" href="/pricing/">Start free</a><a class="btn line" href="{DEMO}">Try the demo</a></div>
+  <p class="fine">Free for one node. The demo is read-only and shows synthetic traffic.</p>
   {PIPELINE}
 </div></section>
 
@@ -297,7 +298,7 @@ def home() -> str:
 <section class="dark final"><div class="wrap">
   <h2>Look at it before you trust it.</h2>
   <p class="sub">Start on the free plan and run the quickstart on your own machine.</p>
-  <div class="actions"><a class="btn primary" href="/pricing/">Start free</a><a class="btn line on-dark" href="{DOCS}">Read the docs</a></div>
+  <div class="actions"><a class="btn primary" href="/pricing/">Start free</a><a class="btn line on-dark" href="{DEMO}">Try the demo</a></div>
 </div></section>
 """
     return page(
@@ -421,7 +422,7 @@ def docs() -> str:
   <p class="eyebrow">Documentation</p>
   <h1>Learn NeuraWall.</h1>
   <p class="lede">Run it in five minutes, understand how it decides, and look up the details.</p>
-  <div class="actions"><a class="btn primary" href="#quickstart">Quickstart</a><a class="btn line" href="/api/docs">API reference</a></div>
+  <div class="actions"><a class="btn primary" href="#quickstart">Quickstart</a><a class="btn line" href="{DEMO}">Try the demo</a><a class="btn line" href="/api/docs">API reference</a></div>
 </div></section>
 
 <section id="quickstart" style="padding-top:32px"><div class="wrap split">
