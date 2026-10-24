@@ -67,3 +67,8 @@ def test_the_docs_landing_links_to_the_live_api_reference(env):
     assert 'href="/api/docs"' in page
     assert 'href="/docs/detection/"' in page
     assert c.get("/api/docs").status_code == 200
+
+
+def test_the_home_page_links_to_the_demo_instance(env):
+    _, c, _ = env
+    assert 'href="https://neurawall-demo.onenexora.com/app/"' in c.get("/").text
