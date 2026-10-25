@@ -46,8 +46,8 @@
       <tr><td>Flow shape: bytes in and out, packet counts, durations, timing</td><td>Tier 1 anomaly engine (Isolation Forest, EWMA baselines)</td><td>A host that suddenly behaves differently, scans, floods</td></tr>
       <tr><td>Inter-arrival timing of one flow</td><td>Beacon detector</td><td>Regular call-backs to a server (C2 beaconing)</td></tr>
       <tr><td>Volume and direction</td><td>Exfiltration detector</td><td>Very large outbound transfers (20 MB and up)</td></tr>
-      <tr><td>TLS handshake: SNI, TLS version, JA3 / JA4, ALPN</td><td>TLS mismatch detector</td><td>A client claiming to be a browser with a non-browser fingerprint</td></tr>
-      <tr><td>DNS query names</td><td>DNS detector</td><td>DGA-looking names and DNS tunnelling</td></tr>
+      <tr><td>TLS handshake: TLS version, JA3 / JA4, and SNI and ALPN when they are not hidden by Encrypted Client Hello (ECH)</td><td>TLS mismatch detector</td><td>A client claiming to be a browser with a non-browser fingerprint</td></tr>
+      <tr><td>DNS query names, only when the sensor can see them (plain DNS, or a resolver the sensor sits behind); not with DoH or DoT to an outside resolver</td><td>DNS detector</td><td>DGA-looking names and DNS tunnelling</td></tr>
     </tbody>
   </table></div>
 

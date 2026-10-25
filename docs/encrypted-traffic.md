@@ -8,8 +8,8 @@ flow metadata. What that covers depends on what the sensor can see.
 | Flow shape: bytes in and out, packet counts, durations, timing | Tier 1 anomaly engine (Isolation Forest, EWMA baselines) | A host that suddenly behaves differently, scans, floods |
 | Inter-arrival timing of one flow | Beacon detector | Regular call-backs to a server (C2 beaconing) |
 | Volume and direction | Exfiltration detector | Very large outbound transfers (20 MB and up) |
-| TLS handshake: SNI, TLS version, JA3 / JA4, ALPN | TLS mismatch detector | A client claiming to be a browser with a non-browser fingerprint |
-| DNS query names | DNS detector | DGA-looking names and DNS tunnelling |
+| TLS handshake: TLS version, JA3 / JA4, and SNI and ALPN when they are not hidden by Encrypted Client Hello (ECH) | TLS mismatch detector | A client claiming to be a browser with a non-browser fingerprint |
+| DNS query names, only when the sensor can see them (plain DNS, or a resolver the sensor sits behind); not with DoH or DoT to an outside resolver | DNS detector | DGA-looking names and DNS tunnelling |
 
 | Needs the request visible (plain HTTP, or a sensor behind your TLS terminator) | Used by |
 |---|---|
