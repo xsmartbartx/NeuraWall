@@ -9,8 +9,8 @@ export function Logo({ size = 26 }: Readonly<{ size?: number }>) {
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
       <rect width="32" height="32" rx="7" fill="var(--bg-raised)" stroke="var(--border-strong)" />
       <path d="M6 9h20M6 16h20M6 23h20" stroke="var(--border-strong)" strokeWidth="2" />
-      <path d="M11 9v7M21 16v7M16 23v-7" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round" />
-      <circle cx="16" cy="16" r="2.6" fill="var(--accent)" />
+      <path d="M11 9v7M21 16v7M16 23v-7" stroke="var(--link)" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="16" cy="16" r="2.6" fill="var(--link)" />
     </svg>
   );
 }

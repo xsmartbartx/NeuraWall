@@ -570,9 +570,9 @@ def not_found() -> str:
 
 
 FAVICON = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#111821" '
-    'stroke="#2b3a49"/><path d="M6 9h20M6 16h20M6 23h20" stroke="#2b3a49" stroke-width="2"/><path d="M11 9v7M21 16v7M16 23v-7" '
-    'stroke="#3ddc97" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.6" fill="#3ddc97"/></svg>\n'
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#18181b" '
+    'stroke="#3f3f46"/><path d="M6 9h20M6 16h20M6 23h20" stroke="#3f3f46" stroke-width="2"/><path d="M11 9v7M21 16v7M16 23v-7" '
+    'stroke="#818cf8" stroke-width="2.4" stroke-linecap="round"/><circle cx="16" cy="16" r="2.6" fill="#818cf8"/></svg>\n'
 )
 
 # Fragment handoff from NEXORA's account app lands on "/", which is now the product site.

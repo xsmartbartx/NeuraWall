@@ -1,17 +1,18 @@
 {
   "_about": "Light theme.",
   "color": {
-    "bg": "#f4f6f8",
+    "bg": "#fafafa",
     "bg-raised": "#ffffff",
-    "bg-sunken": "#eaeef2",
-    "bg-hover": "#eef2f6",
-    "border": "#dbe2e9",
-    "border-strong": "#c3ced9",
-    "text": "#15202b",
-    "text-muted": "#516272",
-    "text-faint": "#5e6c7a",
-    "accent": "#0c7e52",
+    "bg-sunken": "#f4f4f5",
+    "bg-hover": "#f4f4f5",
+    "border": "#e4e4e7",
+    "border-strong": "#d4d4d8",
+    "text": "#18181b",
+    "text-muted": "#52525b",
+    "text-faint": "#5f5f68",
+    "accent": "#4f46e5",
     "accent-ink": "#ffffff",
+    "link": "#4f46e5",
     "allow": "#0c7e52",
     "alert": "#966319",
     "block": "#d02a3f",
@@ -22,7 +23,7 @@
     "sev-medium": "#966319",
     "sev-high": "#b25218",
     "sev-critical": "#d02a3f",
-    "border-input": "#708aa5"
+    "border-input": "#71717a"
   },
   "pairs": [
     [
@@ -75,7 +76,7 @@
       "ui"
     ],
     [
-      "accent",
+      "link",
       "bg-raised"
     ],
     [
